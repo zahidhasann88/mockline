@@ -2,7 +2,7 @@ import { readFile } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import { extname, resolve } from 'node:path';
 import { parse as parseYaml } from 'yaml';
-import { ZodError } from 'zod';
+import type { ZodError } from 'zod';
 import { configSchema, type MocklineConfig } from './schema.js';
 import { MocklineError } from '../errors.js';
 

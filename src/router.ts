@@ -68,6 +68,19 @@ function compilePath(template: string): { regex: RegExp; parameterNames: string[
   return { regex, parameterNames: names, staticSegments, score: staticSegments * 100 + parts.length };
 }
 
+function toMatchedRoute(route: CompiledRoute): MatchedRoute {
+  return {
+    method: route.method,
+    path: route.path,
+    routePath: route.routePath,
+    operationId: route.operationId,
+    operation: route.operation,
+    pathItem: route.pathItem,
+    parameters: route.parameters,
+    score: route.score,
+  };
+}
+
 function operationId(operation: ApiOperation, method: string, path: string): string {
   return typeof operation.operationId === 'string' && operation.operationId.length > 0
     ? operation.operationId
@@ -118,7 +131,7 @@ export function createRouter(document: OpenApiDocument): Router {
     }
   }
   routes.sort((a, b) => b.staticSegments - a.staticSegments || b.score - a.score || a.path.localeCompare(b.path));
-  const publicRoutes = routes.map(({ regex: _regex, parameterNames: _parameterNames, staticSegments: _staticSegments, ...route }) => route);
+  const publicRoutes = routes.map(toMatchedRoute);
 
   const matchesPath = (route: CompiledRoute, pathname: string): Record<string, string> | undefined => {
     const normalized = normalizePath(pathname);
@@ -145,8 +158,7 @@ export function createRouter(document: OpenApiDocument): Router {
         if (route.method !== upper) continue;
         const params = matchesPath(route, pathname);
         if (params) {
-          const { regex: _regex, parameterNames: _parameterNames, staticSegments: _staticSegments, ...publicRoute } = route;
-          return { route: publicRoute, params };
+          return { route: toMatchedRoute(route), params };
         }
       }
       return undefined;

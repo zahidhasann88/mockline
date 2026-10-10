@@ -9,6 +9,7 @@ import { createRouter, normalizePath, type Router } from './router.js';
 import { selectResponse } from './select.js';
 import { RequestRecorder } from './record.js';
 import { handleInspector } from './inspector.js';
+import { ResourceStore } from './state/store.js';
 import { checkSecurityPresence, strictValidationStatus, validateRequest, type ValidationIssue } from './validate.js';
 import type { JsonValue, MatchedRoute, MockResponse, RecordedRequest, RequestFilter, ResponseSource } from './types.js';
 
@@ -218,6 +219,7 @@ export async function createMockServer(options: CreateMockServerOptions): Promis
 
   const router: { current: Router } = { current: createRouter(loaded.document) };
   const spec: LoadedSpec = loaded;
+  const stateStore = new ResourceStore(router.current, loaded.document, config);
   const recorder = new RequestRecorder(config, options.clock);
   const requestCounters = new Map<string, number>();
   const sequenceIndexes = new Map<string, number>();
@@ -225,6 +227,7 @@ export async function createMockServer(options: CreateMockServerOptions): Promis
   const resetRuntime = async (): Promise<void> => {
     requestCounters.clear();
     sequenceIndexes.clear();
+    stateStore.reset();
   };
   let closing = false;
   const handler = async (req: IncomingMessage, res: ServerResponse): Promise<void> => {
@@ -317,6 +320,9 @@ export async function createMockServer(options: CreateMockServerOptions): Promis
               const key = `${route.method} ${route.path}`;
               const counter = requestCounters.get(key) ?? 0;
               requestCounters.set(key, counter + 1);
+              const stateResponse = config.stateful.enabled
+                ? stateStore.handle(route, match.params, url, body)
+                : undefined;
               const selected = selectResponse({
                 root: spec.document,
                 route,
@@ -326,6 +332,7 @@ export async function createMockServer(options: CreateMockServerOptions): Promis
                 body,
                 requestCounter: counter,
                 sequenceIndexes,
+                stateResponse,
               });
               response = selected.response;
               if (selected.sequenceKey) {
@@ -429,6 +436,7 @@ export async function createMockServer(options: CreateMockServerOptions): Promis
       const parsed = configSchema.parse({ overrides: { [key]: override } }).overrides[key];
       if (!parsed) throw new MocklineError(`Invalid override for ${key}`, 1);
       config = { ...config, overrides: { ...config.overrides, [key]: parsed } };
+      stateStore.setConfig(config);
     },
     async close() {
       if (closing) return;

@@ -73,6 +73,37 @@ paths:
           content:
             application/problem+json:
               example: { title: Not Found, status: 404 }
+    put:
+      operationId: replacePet
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/PetInput' }
+      responses:
+        '200':
+          description: Updated pet
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Pet' }
+    patch:
+      operationId: updatePet
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/PetInput' }
+      responses:
+        '200':
+          description: Updated pet
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Pet' }
+    delete:
+      operationId: deletePet
+      responses:
+        '204':
+          description: Deleted pet
 components:
   schemas:
     PetInput:

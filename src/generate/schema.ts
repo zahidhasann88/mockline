@@ -1,4 +1,4 @@
-import { Faker } from '@faker-js/faker';
+import type { Faker } from '@faker-js/faker';
 import { validateSchema } from '../ajv.js';
 import type { JsonSchema, OpenApiDocument, UnknownRecord } from '../types.js';
 import { createFaker, hintedValue, type GenerationHints } from './hints.js';
@@ -113,7 +113,7 @@ function expandCharacterClass(value: string): string[] | undefined {
   let index = 0;
   const chars: string[] = [];
   while (index < value.length) {
-    let first = value[index] ?? '';
+    const first = value[index] ?? '';
     if (first === '\\') {
       const escaped = value[index + 1];
       if (escaped === 'd') chars.push(...'0123456789');
@@ -139,7 +139,7 @@ function expandCharacterClass(value: string): string[] | undefined {
 }
 
 function generateSimplePattern(pattern: string, rng: SeededRandom): string | undefined {
-  let source = pattern.replace(/^\^/, '').replace(/\$$/, '');
+  const source = pattern.replace(/^\^/, '').replace(/\$$/, '');
   if (source.includes('|') || source.includes('(?') || source.includes(')')) return undefined;
   let output = '';
   for (let index = 0; index < source.length;) {
@@ -316,7 +316,7 @@ function generateObject(schema: JsonSchema, context: Context, depth: number): Re
   return result;
 }
 
-function discriminatorValue(branch: JsonSchema, context: Context): { name: string; value: unknown } | undefined {
+function discriminatorValue(branch: JsonSchema): { name: string; value: unknown } | undefined {
   const discriminator = isRecord(branch.discriminator) ? branch.discriminator : undefined;
   const propertyName = typeof discriminator?.propertyName === 'string' ? discriminator.propertyName : undefined;
   if (!propertyName) return undefined;
@@ -382,7 +382,7 @@ function generateNode(rawSchema: JsonSchema, context: Context, depth: number, pr
     const branch = chooseCompositionBranch(schema, context);
     if (branch) {
       const generated = generateNode(branch, context, depth + 1, propertyName);
-      const disc = discriminatorValue(schema, context);
+      const disc = discriminatorValue(schema);
       const base: JsonSchema = { ...schema };
       delete base.oneOf;
       delete base.anyOf;

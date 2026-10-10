@@ -1,5 +1,5 @@
 import { Faker, en } from '@faker-js/faker';
-import { SeededRandom } from './rng.js';
+import type { SeededRandom } from './rng.js';
 
 export type HintValue = string | number | boolean | null;
 export type GenerationHints = Record<string, HintValue | readonly HintValue[]>;

@@ -9,5 +9,7 @@ export type { Router, RouteMatch } from './router.js';
 export { generateFromSchema, generateValue, SeededRandom, deriveSeed, hashSeed } from './generate/index.js';
 export type { GenerationOptions, GeneratorWarning } from './generate/index.js';
 export { validateRequest, checkSecurityPresence } from './validate.js';
+export { ResourceStore, detectCollections } from './state/index.js';
+export type { ResourceCollection } from './state/index.js';
 export type { ValidationIssue, RequestValidationInput, RequestValidationResult } from './validate.js';
 export type { RecordedRequest, RequestFilter, ResponseSource } from './types.js';

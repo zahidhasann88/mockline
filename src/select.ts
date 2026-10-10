@@ -170,7 +170,11 @@ function selectOverride(
     if (selected) return { value: selected, sequenceKey: key };
   }
   if (!override.when && !override.rules?.length) {
-    const { sequence: _sequence, loop: _loop, when: _when, response: _response, rules: _rules, ...fixed } = override;
+    const fixed: OverrideResponseConfig = {};
+    if (override.status !== undefined) fixed.status = override.status;
+    if ('body' in override) fixed.body = override.body;
+    if (override.headers) fixed.headers = override.headers;
+    if (override.delay !== undefined) fixed.delay = override.delay;
     return { value: fixed };
   }
   return undefined;
