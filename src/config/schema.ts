@@ -62,12 +62,12 @@ export const configSchema = z.object({
   }).default({}),
   overrides: z.record(overrideSchema).default({}),
   proxy: z.object({
-    url: z.string().url().optional(),
+    url: z.string().url().refine((value) => /^https?:\/\//i.test(value), { message: 'must use http or https' }).optional(),
     all: z.boolean().default(false),
     allowPrivate: z.boolean().default(false),
     timeoutMs: z.number().int().positive().default(5000),
     recordFile: z.string().optional(),
-  }).default({}),
+  }).refine((value) => !value.all || Boolean(value.url), { message: 'proxy.url is required when proxy.all is true', path: ['url'] }).default({}),
   cors: z.object({
     enabled: z.boolean().default(true),
     origins: z.array(z.string()).default(['*']),

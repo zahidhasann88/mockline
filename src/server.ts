@@ -10,6 +10,7 @@ import { selectResponse } from './select.js';
 import { RequestRecorder } from './record.js';
 import { handleInspector } from './inspector.js';
 import { ResourceStore } from './state/store.js';
+import { forwardRequest, ProxyExampleRecorder } from './proxy.js';
 import { checkSecurityPresence, strictValidationStatus, validateRequest, type ValidationIssue } from './validate.js';
 import type { JsonValue, MatchedRoute, MockResponse, RecordedRequest, RequestFilter, ResponseSource } from './types.js';
 
@@ -42,6 +43,8 @@ export interface CreateMockServerOptions {
 interface ParsedBody {
   present: boolean;
   value?: unknown;
+  raw: Buffer;
+  parseError?: string;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -108,8 +111,9 @@ function writeJson(res: ServerResponse, status: number, body: unknown, headers: 
     return;
   }
   const contentType = String(res.getHeader('content-type') ?? '').toLowerCase();
-  let serialized: string;
-  if (typeof body === 'string' && !contentType.includes('json')) serialized = body;
+  let serialized: string | Buffer;
+  if (Buffer.isBuffer(body)) serialized = body;
+  else if (typeof body === 'string' && !contentType.includes('json')) serialized = body;
   else if (body === undefined) serialized = '';
   else {
     try {
@@ -120,7 +124,7 @@ function writeJson(res: ServerResponse, status: number, body: unknown, headers: 
       res.setHeader('content-type', 'application/problem+json; charset=utf-8');
     }
   }
-  res.setHeader('content-length', Buffer.byteLength(serialized));
+  res.setHeader('content-length', Buffer.isBuffer(serialized) ? serialized.byteLength : Buffer.byteLength(serialized));
   try {
     res.end(serialized);
   } catch {
@@ -156,18 +160,19 @@ async function readBody(req: IncomingMessage, limit: number): Promise<ParsedBody
     if (req.destroyed) throw error;
     throw new InvalidJsonError('Could not read request body.');
   }
-  if (size === 0) return { present: false };
-  const text = Buffer.concat(chunks).toString('utf8');
+  if (size === 0) return { present: false, raw: Buffer.alloc(0) };
+  const raw = Buffer.concat(chunks);
+  const text = raw.toString('utf8');
   const contentType = String(req.headers['content-type'] ?? '').split(';')[0]?.trim().toLowerCase() ?? '';
   if (contentType === 'application/json' || contentType.endsWith('+json')) {
     try {
-      return { present: true, value: JSON.parse(text) as unknown };
+      return { present: true, value: JSON.parse(text) as unknown, raw };
     } catch (error) {
       const reason = error instanceof Error ? error.message : 'invalid JSON';
-      throw new InvalidJsonError(`Malformed JSON request body: ${reason}`);
+      return { present: true, raw, parseError: `Malformed JSON request body: ${reason}` };
     }
   }
-  return { present: true, value: text };
+  return { present: true, value: text, raw };
 }
 
 function issueStrings(issues: ValidationIssue[]): string[] {
@@ -221,6 +226,7 @@ export async function createMockServer(options: CreateMockServerOptions): Promis
   const spec: LoadedSpec = loaded;
   const stateStore = new ResourceStore(router.current, loaded.document, config);
   const recorder = new RequestRecorder(config, options.clock);
+  const proxyExamples = new ProxyExampleRecorder(config.proxy.recordFile);
   const requestCounters = new Map<string, number>();
   const sequenceIndexes = new Map<string, number>();
   const startedAt = options.clock?.() ?? new Date();
@@ -248,11 +254,35 @@ export async function createMockServer(options: CreateMockServerOptions): Promis
     const pathname = normalizePath(url.pathname);
     let body: unknown;
     let bodyPresent = false;
+    let rawBody: Buffer<ArrayBufferLike> = Buffer.alloc(0);
     let route: MatchedRoute | undefined;
     let response: MockResponse = problemResponse(500, 'Internal Server Error', 'Request processing did not complete.');
     let validationErrors: string[] = [];
     let source: ResponseSource | 'error' | 'inspector' = 'error';
     let responseHeaders: Record<string, string> = {};
+    const forward = async (matchedRoute?: MatchedRoute): Promise<MockResponse> => {
+      if (!config.proxy.url) return problemResponse(502, 'Bad Gateway', 'No proxy upstream is configured.');
+      const proxied = await forwardRequest({
+        upstream: config.proxy.url,
+        method,
+        requestUrl: url,
+        headers: asHeaders(req.headers),
+        body: rawBody,
+        config: config.proxy,
+        fetchImpl: options.fetch,
+      });
+      if (!proxied.blocked && config.proxy.recordFile) {
+        proxyExamples.record({
+          method,
+          path: `${url.pathname}${url.search}`,
+          ...(matchedRoute ? { operationId: matchedRoute.operationId } : {}),
+          status: proxied.status,
+          headers: proxied.headers,
+          body: proxied.body,
+        });
+      }
+      return { status: proxied.status, body: proxied.body, headers: proxied.headers, source: 'proxy' };
+    };
 
     try {
       if (pathname.startsWith('/__mockline')) {
@@ -275,19 +305,31 @@ export async function createMockServer(options: CreateMockServerOptions): Promis
         const read = await readBody(req, config.requestBodyLimit);
         body = read.value;
         bodyPresent = read.present;
-        const match = router.current.match(method, pathname);
-        if (!match) {
-          const methods = router.current.methodsForPath(pathname);
-          const nearest = router.current.nearestPath(pathname);
-          if (methods.length > 0) {
-            response = problemResponse(405, 'Method Not Allowed', `Method ${method} is not allowed for ${pathname}.`, nearest ? { nearestPath: nearest } : {});
-            responseHeaders = { Allow: methods.join(', ') };
-          } else {
-            response = problemResponse(404, 'Not Found', nearest ? `No route matched. Nearest path: ${nearest}.` : `No route matched ${pathname}.`, nearest ? { nearestPath: nearest } : {});
-          }
-          source = 'error';
+        rawBody = read.raw;
+        if (config.proxy.all && config.proxy.url) {
+          response = await forward();
+          source = 'proxy';
         } else {
-          route = match.route;
+          const match = router.current.match(method, pathname);
+          if (!match) {
+            if (read.parseError && !config.proxy.url) throw new InvalidJsonError(read.parseError);
+            if (config.proxy.url) {
+              response = await forward();
+              source = 'proxy';
+            } else {
+              const methods = router.current.methodsForPath(pathname);
+              const nearest = router.current.nearestPath(pathname);
+              if (methods.length > 0) {
+                response = problemResponse(405, 'Method Not Allowed', `Method ${method} is not allowed for ${pathname}.`, nearest ? { nearestPath: nearest } : {});
+                responseHeaders = { Allow: methods.join(', ') };
+              } else {
+                response = problemResponse(404, 'Not Found', nearest ? `No route matched. Nearest path: ${nearest}.` : `No route matched ${pathname}.`, nearest ? { nearestPath: nearest } : {});
+              }
+              source = 'error';
+            }
+          } else {
+            if (read.parseError) throw new InvalidJsonError(read.parseError);
+            route = match.route;
           let authorized = true;
           if (config.enforceAuth) {
             const auth = checkSecurityPresence(spec.document, route.operation, asHeaders(req.headers), url);
@@ -343,6 +385,7 @@ export async function createMockServer(options: CreateMockServerOptions): Promis
               source = response.source;
               if (responseHeaders['X-Mockline-Validation']) response = { ...response, headers: { ...response.headers, 'X-Mockline-Validation': 'failed' } };
             }
+          }
           }
         }
       }
@@ -445,6 +488,7 @@ export async function createMockServer(options: CreateMockServerOptions): Promis
         httpServer.close((error) => error ? reject(error) : resolve());
       });
       await recorder.flush();
+      await proxyExamples.flush();
     },
   };
 }
