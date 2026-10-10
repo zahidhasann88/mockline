@@ -3,6 +3,7 @@ import { once } from 'node:events';
 import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
+import { stripVTControlCharacters } from 'node:util';
 import { describe, expect, it, vi } from 'vitest';
 import { runCli } from '../src/cli.js';
 import { fixture } from './helpers.js';
@@ -109,7 +110,7 @@ describe('CLI', () => {
       [cliFile, 'validate', fixture('recursive-polymorphic.yaml')],
       { encoding: 'utf8' },
     );
-    expect(validation).toContain('Valid 3.0.3');
+    expect(stripVTControlCharacters(validation)).toContain('Valid 3.0.3');
     const schemaRoutes = execFileSync(
       process.execPath,
       [cliFile, 'routes', fixture('schema-only.yaml')],
