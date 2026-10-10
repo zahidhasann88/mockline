@@ -30,6 +30,12 @@ in memory. It uses Node's built-in HTTP server and binds to loopback by default.
 
 Mockline is for local development, tests, and demos—not production traffic.
 
+## Preview
+
+![Mockline route listing showing HTTP methods, paths, operation IDs, response statuses, and response sources](docs/screenshots/demo.png)
+
+Route listings show each operation's default response status and whether its response comes from an example or schema generation.
+
 ## Requirements and installation
 
 - Node.js 20 or newer.
