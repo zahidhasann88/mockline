@@ -29,9 +29,9 @@ function cloneRecord(record: RecordedRequest): RecordedRequest {
 
 export class RequestRecorder {
   private readonly buffer: RecordedRequest[] = [];
-  private readonly maxRequests: number;
-  private readonly file?: string;
-  private readonly redact: string[];
+  private maxRequests: number;
+  private file?: string;
+  private redact: string[];
   private readonly clock: () => Date;
   private nextId = 1;
   private writeQueue: Promise<void> = Promise.resolve();
@@ -69,6 +69,13 @@ export class RequestRecorder {
       });
     }
     return cloneRecord(entry);
+  }
+
+  setConfig(config: MocklineConfig): void {
+    this.maxRequests = config.recording.maxRequests;
+    this.file = config.recording.file ? resolve(config.recording.file) : undefined;
+    this.redact = config.recording.redactHeaders;
+    while (this.buffer.length > this.maxRequests) this.buffer.shift();
   }
 
   list(filter: RequestFilter = {}): RecordedRequest[] {

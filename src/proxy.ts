@@ -201,10 +201,14 @@ function decodeExample(input: ProxyExampleInput): SavedProxyExample {
 }
 
 export class ProxyExampleRecorder {
-  private readonly file?: string;
+  private file?: string;
   private queue: Promise<void> = Promise.resolve();
 
   constructor(file?: string) {
+    this.file = file ? resolve(file) : undefined;
+  }
+
+  setFile(file?: string): void {
     this.file = file ? resolve(file) : undefined;
   }
 

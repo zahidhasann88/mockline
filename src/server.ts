@@ -1,4 +1,7 @@
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http';
+import { resolve } from 'node:path';
+import { watch as watchFiles, type FSWatcher } from 'chokidar';
+import { loadConfig } from './config/load.js';
 import { isIP } from 'node:net';
 import { setTimeout as sleep } from 'node:timers/promises';
 import { configSchema, type MocklineConfig, type OverrideConfig } from './config/schema.js';
@@ -38,6 +41,9 @@ export interface CreateMockServerOptions {
   logger?: Logger;
   clock?: () => Date;
   fetch?: typeof globalThis.fetch;
+  watch?: boolean;
+  configFile?: string;
+  reloadConfig?: () => Promise<MocklineConfig>;
 }
 
 interface ParsedBody {
@@ -222,20 +228,25 @@ export async function createMockServer(options: CreateMockServerOptions): Promis
   }
   if (['0.0.0.0', '::'].includes(config.host)) logger.warn(`Binding to ${config.host} exposes this mock server to the network.`);
 
-  const router: { current: Router } = { current: createRouter(loaded.document) };
-  const spec: LoadedSpec = loaded;
-  const stateStore = new ResourceStore(router.current, loaded.document, config);
+  const routerState: { current: Router } = { current: createRouter(loaded.document) };
+  const specState: { current: LoadedSpec } = { current: loaded };
+  const stateStoreState = { current: new ResourceStore(routerState.current, loaded.document, config) };
   const recorder = new RequestRecorder(config, options.clock);
   const proxyExamples = new ProxyExampleRecorder(config.proxy.recordFile);
   const requestCounters = new Map<string, number>();
   const sequenceIndexes = new Map<string, number>();
   const startedAt = options.clock?.() ?? new Date();
+  const boundPort = config.port;
+  const boundHost = config.host;
   const resetRuntime = async (): Promise<void> => {
     requestCounters.clear();
     sequenceIndexes.clear();
-    stateStore.reset();
+    stateStoreState.current.reset();
   };
   let closing = false;
+  let watcher: FSWatcher | undefined;
+  let specReloadTimer: NodeJS.Timeout | undefined;
+  let configReloadTimer: NodeJS.Timeout | undefined;
   const handler = async (req: IncomingMessage, res: ServerResponse): Promise<void> => {
     const started = (options.clock ?? (() => new Date()))().getTime();
     const method = (req.method ?? 'GET').toUpperCase();
@@ -290,7 +301,7 @@ export async function createMockServer(options: CreateMockServerOptions): Promis
           enabled: inspectorEnabled,
           recorder,
           config,
-          spec,
+          spec: specState.current,
           startedAt,
           reset: resetRuntime,
         });
@@ -310,15 +321,15 @@ export async function createMockServer(options: CreateMockServerOptions): Promis
           response = await forward();
           source = 'proxy';
         } else {
-          const match = router.current.match(method, pathname);
+          const match = routerState.current.match(method, pathname);
           if (!match) {
             if (read.parseError && !config.proxy.url) throw new InvalidJsonError(read.parseError);
             if (config.proxy.url) {
               response = await forward();
               source = 'proxy';
             } else {
-              const methods = router.current.methodsForPath(pathname);
-              const nearest = router.current.nearestPath(pathname);
+              const methods = routerState.current.methodsForPath(pathname);
+              const nearest = routerState.current.nearestPath(pathname);
               if (methods.length > 0) {
                 response = problemResponse(405, 'Method Not Allowed', `Method ${method} is not allowed for ${pathname}.`, nearest ? { nearestPath: nearest } : {});
                 responseHeaders = { Allow: methods.join(', ') };
@@ -332,7 +343,7 @@ export async function createMockServer(options: CreateMockServerOptions): Promis
             route = match.route;
           let authorized = true;
           if (config.enforceAuth) {
-            const auth = checkSecurityPresence(spec.document, route.operation, asHeaders(req.headers), url);
+            const auth = checkSecurityPresence(specState.current.document, route.operation, asHeaders(req.headers), url);
             authorized = auth.authorized;
             if (!authorized) {
               response = problemResponse(401, 'Unauthorized', 'A credential declared by the OpenAPI security scheme is required.', { errors: auth.missing });
@@ -343,7 +354,7 @@ export async function createMockServer(options: CreateMockServerOptions): Promis
           if (authorized) {
             const validation = config.validate === 'off'
               ? { valid: true, issues: [], bodyInvalid: false }
-              : validateRequest({ root: spec.document, route, params: match.params, url, headers: asHeaders(req.headers), body, bodyPresent });
+              : validateRequest({ root: specState.current.document, route, params: match.params, url, headers: asHeaders(req.headers), body, bodyPresent });
             const strictFailure = !validation.valid && config.validate === 'strict';
             if (!validation.valid) {
               validationErrors = issueStrings(validation.issues);
@@ -363,10 +374,10 @@ export async function createMockServer(options: CreateMockServerOptions): Promis
               const counter = requestCounters.get(key) ?? 0;
               requestCounters.set(key, counter + 1);
               const stateResponse = config.stateful.enabled
-                ? stateStore.handle(route, match.params, url, body)
+                ? stateStoreState.current.handle(route, match.params, url, body)
                 : undefined;
               const selected = selectResponse({
-                root: spec.document,
+                root: specState.current.document,
                 route,
                 config,
                 headers: asHeaders(req.headers),
@@ -469,6 +480,76 @@ export async function createMockServer(options: CreateMockServerOptions): Promis
   const url = `http://${hostnameForUrl(config.host)}:${actualPort}`;
   const requests = createRequestAccessor(recorder);
 
+  if (options.watch) {
+    const specPath = resolve(options.spec);
+    const configPaths = options.configFile
+      ? [resolve(options.configFile)]
+      : [resolve('mockline.yaml'), resolve('mockline.yml'), resolve('mockline.json')];
+    const watchedPaths = [...new Set([specPath, ...configPaths])];
+    const reloadSpec = async (): Promise<void> => {
+      try {
+        const nextSpec = await loadSpec(options.spec);
+        const nextRouter = createRouter(nextSpec.document);
+        const nextStore = new ResourceStore(nextRouter, nextSpec.document, config);
+        specState.current = nextSpec;
+        routerState.current = nextRouter;
+        stateStoreState.current = nextStore;
+        requestCounters.clear();
+        sequenceIndexes.clear();
+        logger.info(`Reloaded OpenAPI spec ${options.spec}`);
+      } catch (error) {
+        logger.error(`Invalid OpenAPI change; keeping the last good spec: ${error instanceof Error ? error.message : String(error)}`);
+      }
+    };
+    const reloadConfiguration = async (): Promise<void> => {
+      try {
+        const loadedConfig = options.reloadConfig
+          ? await options.reloadConfig()
+          : (await loadConfig(options.configFile)).config;
+        if (loadedConfig.port !== boundPort || loadedConfig.host !== boundHost) {
+          logger.warn('Hot reload cannot change the bound host or port; keeping the original listener address.');
+        }
+        const nextConfig = configSchema.parse({ ...loadedConfig, port: boundPort, host: boundHost });
+        const stateChanged = config.seed !== nextConfig.seed
+          || JSON.stringify(config.stateful) !== JSON.stringify(nextConfig.stateful);
+        config = nextConfig;
+        recorder.setConfig(config);
+        proxyExamples.setFile(config.proxy.recordFile);
+        stateStoreState.current.setConfig(config);
+        if (stateChanged) stateStoreState.current.reset();
+        setServerRequestTimeout(httpServer, config.requestTimeoutMs);
+        logger.info('Reloaded Mockline configuration');
+      } catch (error) {
+        logger.error(`Invalid config change; keeping the last good config: ${error instanceof Error ? error.message : String(error)}`);
+      }
+    };
+    const schedule = (kind: 'spec' | 'config'): void => {
+      if (closing) return;
+      const previous = kind === 'spec' ? specReloadTimer : configReloadTimer;
+      if (previous) clearTimeout(previous);
+      const timer = setTimeout(() => {
+        if (kind === 'spec') void reloadSpec();
+        else void reloadConfiguration();
+      }, 120);
+      timer.unref();
+      if (kind === 'spec') specReloadTimer = timer;
+      else configReloadTimer = timer;
+    };
+    watcher = watchFiles(watchedPaths, {
+      ignoreInitial: true,
+      awaitWriteFinish: { stabilityThreshold: 120, pollInterval: 30 },
+    });
+    watcher.on('all', (event, changedPath) => {
+      if (!['add', 'change', 'unlink'].includes(event)) return;
+      const absolutePath = resolve(changedPath);
+      if (absolutePath === specPath) schedule('spec');
+      if (configPaths.includes(absolutePath)) schedule('config');
+    });
+    watcher.on('error', (error: unknown) => {
+      logger.error(`Watch error: ${error instanceof Error ? error.message : String(error)}`);
+    });
+  }
+
   return {
     url,
     requests,
@@ -479,11 +560,14 @@ export async function createMockServer(options: CreateMockServerOptions): Promis
       const parsed = configSchema.parse({ overrides: { [key]: override } }).overrides[key];
       if (!parsed) throw new MocklineError(`Invalid override for ${key}`, 1);
       config = { ...config, overrides: { ...config.overrides, [key]: parsed } };
-      stateStore.setConfig(config);
+      stateStoreState.current.setConfig(config);
     },
     async close() {
       if (closing) return;
       closing = true;
+      if (specReloadTimer) clearTimeout(specReloadTimer);
+      if (configReloadTimer) clearTimeout(configReloadTimer);
+      await watcher?.close();
       await new Promise<void>((resolve, reject) => {
         httpServer.close((error) => error ? reject(error) : resolve());
       });

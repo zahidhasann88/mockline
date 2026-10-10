@@ -67,7 +67,7 @@ function cleanResponseFields(item: Record<string, unknown>, definition: Resource
 export class ResourceStore {
   readonly collections: ResourceCollection[];
   private readonly root: OpenApiDocument;
-  private readonly seed: number;
+  private seed: number;
   private config: MocklineConfig;
   private readonly data = new Map<string, CollectionState>();
   private readonly routeIndex = new Map<string, { state: CollectionState; kind: 'list' | 'create' | 'item'; route: MatchedRoute }>();
@@ -91,6 +91,7 @@ export class ResourceStore {
 
   setConfig(config: MocklineConfig): void {
     this.config = config;
+    this.seed = config.seed ?? 0;
   }
 
   reset(): void {

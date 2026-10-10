@@ -285,6 +285,12 @@ async function startServing(specPath: string, options: CliOptions): Promise<void
     config,
     inspector: options.inspector,
     logger,
+    watch: options.watch === true,
+    configFile: loadedConfig.path ?? options.config,
+    reloadConfig: async () => {
+      const freshConfig = await loadConfig(options.config);
+      return makeConfig(freshConfig.config, options);
+    },
   });
   logger.info(`Mock API listening at ${server.url}`);
   if (options.quiet !== true) logger.info(`Inspector: ${server.url}/__mockline/health`);
