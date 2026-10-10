@@ -1,0 +1,43 @@
+# Keep the mock on loopback for local development.
+port: 4010
+host: 127.0.0.1
+seed: 42
+prefer: example
+validate: warn
+latency: 0
+
+stateful:
+  enabled: true
+  seedItems: 3
+  idProperty: id
+
+generation:
+  hints: true
+  counter: false
+  maxDepth: 3
+  minArrayItems: 1
+  maxArrayItems: 3
+
+recording:
+  enabled: true
+  maxRequests: 500
+  redactHeaders:
+    - authorization
+    - cookie
+    - set-cookie
+    - x-api-key
+    - api-key
+    - x-auth-token
+
+# A conditional override is selected before stateful CRUD responses.
+overrides:
+  listPets:
+    rules:
+      - when:
+          location: query
+          name: demo
+          op: eq
+          value: empty
+        response:
+          status: 200
+          body: []

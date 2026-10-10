@@ -1,0 +1,169 @@
+openapi: 3.0.3
+info:
+  title: Mockline Petstore Fixture
+  version: 1.0.0
+servers:
+  - url: https://api.example.test/v1
+paths:
+  /pets:
+    get:
+      operationId: listPets
+      parameters:
+        - name: limit
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 100 }
+        - name: filter
+          in: query
+          style: deepObject
+          explode: true
+          schema:
+            type: object
+            properties:
+              active: { type: boolean }
+        - name: X-Trace
+          in: header
+          schema: { type: string }
+      responses:
+        '200':
+          description: A page of pets
+          content:
+            application/json:
+              examples:
+                kitten:
+                  summary: Small sample list
+                  value:
+                    - id: 17
+                      name: Miso
+                      tag: cat
+                      createdAt: '2025-01-02T03:04:05Z'
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/Pet' }
+    post:
+      operationId: createPet
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/PetInput' }
+      responses:
+        '201':
+          description: Created pet
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Pet' }
+  /pets/mine:
+    get:
+      operationId: getMyPets
+      responses:
+        '200':
+          description: Static path wins over petId
+          content:
+            application/json:
+              example: { id: 88, name: My pet, tag: dog }
+  /pets/{petId}:
+    parameters:
+      - name: petId
+        in: path
+        required: true
+        schema: { type: integer, minimum: 1 }
+    get:
+      operationId: getPet
+      responses:
+        '200':
+          description: Pet details
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Pet' }
+        '404':
+          description: Not found
+          content:
+            application/problem+json:
+              example: { title: Not Found, status: 404 }
+    put:
+      operationId: replacePet
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/PetInput' }
+      responses:
+        '200':
+          description: Replaced pet
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Pet' }
+    patch:
+      operationId: patchPet
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/PetInput' }
+      responses:
+        '200':
+          description: Updated pet
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Pet' }
+    delete:
+      operationId: deletePet
+      responses:
+        '204':
+          description: Deleted pet
+  /private:
+    get:
+      operationId: readPrivate
+      security:
+        - ApiKeyAuth: []
+      responses:
+        '200':
+          description: Protected response
+          content:
+            application/json:
+              example: { ok: true }
+  /hello:
+    get:
+      operationId: hello
+      responses:
+        '200':
+          description: Plain text greeting
+          content:
+            text/plain:
+              example: hello from mockline
+  /accept:
+    get:
+      operationId: acceptedMedia
+      responses:
+        '200':
+          description: Negotiated body
+          content:
+            application/json:
+              example: { format: json }
+            text/plain:
+              example: plain
+components:
+  securitySchemes:
+    ApiKeyAuth:
+      type: apiKey
+      in: header
+      name: X-API-Key
+  schemas:
+    PetInput:
+      type: object
+      required: [name]
+      properties:
+        name: { type: string, minLength: 2 }
+        tag: { type: string, enum: [cat, dog, bird] }
+        password: { type: string, writeOnly: true }
+        id: { type: integer, readOnly: true, minimum: 1 }
+    Pet:
+      allOf:
+        - $ref: '#/components/schemas/PetInput'
+        - type: object
+          required: [id, email, createdAt]
+          properties:
+            id: { type: integer, readOnly: true, minimum: 1 }
+            email: { type: string, format: email }
+            createdAt: { type: string, format: date-time }
+            password: { type: string, writeOnly: true }
