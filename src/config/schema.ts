@@ -82,6 +82,7 @@ export const configSchema = z.object({
   }).default({}),
   generation: z.object({
     hints: z.boolean().default(true),
+    counter: z.boolean().default(false),
     maxDepth: z.number().int().min(0).max(20).default(3),
     minArrayItems: z.number().int().min(0).default(1),
     maxArrayItems: z.number().int().min(0).default(3),

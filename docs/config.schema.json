@@ -1,0 +1,478 @@
+{
+  "$ref": "#/definitions/MocklineConfig",
+  "definitions": {
+    "MocklineConfig": {
+      "type": "object",
+      "properties": {
+        "port": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 65535,
+          "default": 4010
+        },
+        "host": {
+          "type": "string",
+          "minLength": 1,
+          "default": "127.0.0.1"
+        },
+        "seed": {
+          "type": "integer"
+        },
+        "prefer": {
+          "type": "string",
+          "enum": [
+            "example",
+            "generate"
+          ],
+          "default": "example"
+        },
+        "latency": {
+          "anyOf": [
+            {
+              "type": "number",
+              "minimum": 0
+            },
+            {
+              "type": "array",
+              "minItems": 2,
+              "maxItems": 2,
+              "items": [
+                {
+                  "type": "number",
+                  "minimum": 0
+                },
+                {
+                  "type": "number",
+                  "minimum": 0
+                }
+              ]
+            },
+            {
+              "type": "object",
+              "properties": {
+                "fixed": {
+                  "type": "number",
+                  "minimum": 0
+                },
+                "min": {
+                  "type": "number",
+                  "minimum": 0
+                },
+                "max": {
+                  "type": "number",
+                  "minimum": 0
+                },
+                "distribution": {
+                  "type": "string",
+                  "enum": [
+                    "uniform",
+                    "normal"
+                  ],
+                  "default": "uniform"
+                }
+              },
+              "additionalProperties": false
+            }
+          ],
+          "default": 0
+        },
+        "errors": {
+          "type": "object",
+          "properties": {
+            "rate": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1,
+              "default": 0
+            },
+            "statuses": {
+              "type": "array",
+              "items": {
+                "type": "integer",
+                "minimum": 400,
+                "maximum": 599
+              },
+              "minItems": 1,
+              "default": [
+                500,
+                503
+              ]
+            },
+            "perOperationRates": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1
+              },
+              "default": {}
+            }
+          },
+          "additionalProperties": false,
+          "default": {}
+        },
+        "validate": {
+          "type": "string",
+          "enum": [
+            "off",
+            "warn",
+            "strict"
+          ],
+          "default": "warn"
+        },
+        "stateful": {
+          "type": "object",
+          "properties": {
+            "enabled": {
+              "type": "boolean",
+              "default": false
+            },
+            "seedItems": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 3
+            },
+            "idProperty": {
+              "type": "string",
+              "minLength": 1,
+              "default": "id"
+            },
+            "sequenceLoop": {
+              "type": "boolean",
+              "default": false
+            }
+          },
+          "additionalProperties": false,
+          "default": {}
+        },
+        "overrides": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "object",
+            "properties": {
+              "status": {
+                "type": "integer",
+                "minimum": 100,
+                "maximum": 599
+              },
+              "body": {},
+              "headers": {
+                "type": "object",
+                "additionalProperties": {
+                  "type": "string"
+                }
+              },
+              "delay": {
+                "type": "number",
+                "minimum": 0
+              },
+              "sequence": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "integer",
+                      "minimum": 100,
+                      "maximum": 599
+                    },
+                    "body": {},
+                    "headers": {
+                      "type": "object",
+                      "additionalProperties": {
+                        "type": "string"
+                      }
+                    },
+                    "delay": {
+                      "type": "number",
+                      "minimum": 0
+                    }
+                  },
+                  "additionalProperties": false
+                },
+                "minItems": 1
+              },
+              "loop": {
+                "type": "boolean",
+                "default": false
+              },
+              "when": {
+                "type": "object",
+                "properties": {
+                  "location": {
+                    "type": "string",
+                    "enum": [
+                      "query",
+                      "header",
+                      "body"
+                    ]
+                  },
+                  "name": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "op": {
+                    "type": "string",
+                    "enum": [
+                      "eq",
+                      "contains",
+                      "regex"
+                    ],
+                    "default": "eq"
+                  },
+                  "value": {}
+                },
+                "required": [
+                  "location",
+                  "name"
+                ],
+                "additionalProperties": false
+              },
+              "response": {
+                "type": "object",
+                "properties": {
+                  "status": {
+                    "type": "integer",
+                    "minimum": 100,
+                    "maximum": 599
+                  },
+                  "body": {},
+                  "headers": {
+                    "type": "object",
+                    "additionalProperties": {
+                      "type": "string"
+                    }
+                  },
+                  "delay": {
+                    "type": "number",
+                    "minimum": 0
+                  }
+                },
+                "additionalProperties": false
+              },
+              "rules": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "when": {
+                      "type": "object",
+                      "properties": {
+                        "location": {
+                          "type": "string",
+                          "enum": [
+                            "query",
+                            "header",
+                            "body"
+                          ]
+                        },
+                        "name": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "op": {
+                          "type": "string",
+                          "enum": [
+                            "eq",
+                            "contains",
+                            "regex"
+                          ],
+                          "default": "eq"
+                        },
+                        "value": {}
+                      },
+                      "required": [
+                        "location",
+                        "name"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "response": {
+                      "type": "object",
+                      "properties": {
+                        "status": {
+                          "type": "integer",
+                          "minimum": 100,
+                          "maximum": 599
+                        },
+                        "body": {},
+                        "headers": {
+                          "type": "object",
+                          "additionalProperties": {
+                            "type": "string"
+                          }
+                        },
+                        "delay": {
+                          "type": "number",
+                          "minimum": 0
+                        }
+                      },
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "when",
+                    "response"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            },
+            "additionalProperties": false
+          },
+          "default": {}
+        },
+        "proxy": {
+          "type": "object",
+          "properties": {
+            "url": {
+              "type": "string",
+              "format": "uri"
+            },
+            "all": {
+              "type": "boolean",
+              "default": false
+            },
+            "allowPrivate": {
+              "type": "boolean",
+              "default": false
+            },
+            "timeoutMs": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "default": 5000
+            },
+            "recordFile": {
+              "type": "string"
+            }
+          },
+          "additionalProperties": false,
+          "default": {}
+        },
+        "cors": {
+          "type": "object",
+          "properties": {
+            "enabled": {
+              "type": "boolean",
+              "default": true
+            },
+            "origins": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "default": [
+                "*"
+              ]
+            }
+          },
+          "additionalProperties": false,
+          "default": {}
+        },
+        "recording": {
+          "type": "object",
+          "properties": {
+            "enabled": {
+              "type": "boolean",
+              "default": true
+            },
+            "file": {
+              "type": "string"
+            },
+            "maxRequests": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "default": 500
+            },
+            "redactHeaders": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "default": [
+                "authorization",
+                "cookie",
+                "set-cookie",
+                "x-api-key",
+                "api-key",
+                "x-auth-token"
+              ]
+            }
+          },
+          "additionalProperties": false,
+          "default": {}
+        },
+        "generation": {
+          "type": "object",
+          "properties": {
+            "hints": {
+              "type": "boolean",
+              "default": true
+            },
+            "counter": {
+              "type": "boolean",
+              "default": false
+            },
+            "maxDepth": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 20,
+              "default": 3
+            },
+            "minArrayItems": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 1
+            },
+            "maxArrayItems": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 3
+            }
+          },
+          "additionalProperties": false,
+          "default": {}
+        },
+        "controlHeaders": {
+          "type": "object",
+          "properties": {
+            "allow": {
+              "type": "boolean",
+              "default": true
+            }
+          },
+          "additionalProperties": false,
+          "default": {}
+        },
+        "inspector": {
+          "type": "object",
+          "properties": {
+            "enabled": {
+              "type": "boolean"
+            }
+          },
+          "additionalProperties": false,
+          "default": {}
+        },
+        "enforceAuth": {
+          "type": "boolean",
+          "default": false
+        },
+        "requestBodyLimit": {
+          "type": "integer",
+          "exclusiveMinimum": 0,
+          "default": 1048576
+        },
+        "requestTimeoutMs": {
+          "type": "integer",
+          "exclusiveMinimum": 0,
+          "default": 30000
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Mockline configuration",
+  "description": "Configuration accepted by Mockline CLI and library."
+}
