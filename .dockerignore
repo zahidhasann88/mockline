@@ -1,0 +1,11 @@
+.git
+.gitignore
+node_modules
+dist
+coverage
+.cache
+.local
+.tmpinit
+.npm
+*.log
+.env*

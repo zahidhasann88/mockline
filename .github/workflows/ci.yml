@@ -2,8 +2,14 @@ name: CI
 on:
   push:
   pull_request:
+  workflow_call:
+
+permissions:
+  contents: read
+
 jobs:
   test:
+    name: Node ${{ matrix.node }} on ${{ matrix.os }}
     strategy:
       fail-fast: false
       matrix:
@@ -12,17 +18,37 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9.15.9
       - uses: actions/setup-node@v4
         with:
           node-version: ${{ matrix.node }}
           cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm format:check
+      - run: pnpm lint
+      - run: pnpm typecheck
+      - run: pnpm schema:config
+      - run: git diff --exit-code -- docs/config.schema.json
+      - run: pnpm test
+
+  publishability:
+    name: Package and container checks
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
         with:
           version: 9.15.9
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - run: pnpm lint
-      - run: pnpm typecheck
-      - run: pnpm test
       - run: pnpm build
       - run: pnpm publint
       - run: pnpm attw
+      - run: pnpm pack:check
+      - run: docker build --tag mockline:ci .
