@@ -22,7 +22,7 @@ production API server or authorization system.
 
 ## Reporting a vulnerability
 
-Please report security issues privately through GitHub Security Advisories for
-the repository, once enabled. Include affected versions, impact, and
+Report security issues to jahidhasann67@gmail.com or through GitHub Security
+Advisories for this repository. Include affected versions, impact, and
 reproduction steps; do not include live credentials or personal data. Please do
 not open a public issue for an unpatched vulnerability.

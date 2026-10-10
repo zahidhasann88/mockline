@@ -1,47 +1,32 @@
-# Release checklist
+# Releasing Mockline
 
-The repository deliberately has no git remote and the package/GitHub identity is
-a template. Do not tag or publish until the publisher has configured the real
-identity and reviewed the diff.
+GitHub repository: zahidhasann88/mockline. npm package: @zahidhasann/mockline.
+The CLI remains mockline. The npm account must own the zahidhasann scope.
 
-## One-time setup
+## First npm publication
 
-1. Replace `@your-github-username/mockline` in `package.json` and examples with
-   the publisher's available lowercase npm scope. Keep the CLI binary name
-   `mockline`; the unscoped npm name is taken.
-2. Replace `YOUR_GITHUB_USERNAME` in the package repository, bugs, and homepage
-   URLs and update `LICENSE`'s `YOUR NAME` copyright holder.
-3. Create the GitHub repository and configure npm trusted publishing for that
-   exact GitHub owner/repository and `.github/workflows/release.yml`. No
-   long-lived npm token is required. The release job grants `id-token: write`
-   and runs `npm publish --provenance --access public` from Node 22 with a
-   recent npm CLI.
-4. Enable GitHub Actions and grant the repository's `GITHUB_TOKEN` permission
-   to publish packages to GHCR. Confirm repository/package visibility and
-   naming. The release workflow publishes `ghcr.io/<owner>/<repository>` with
-   the version tag and `latest`.
-5. Confirm the license holder, README claims, changelog, security contact, and
-   package contents. Do not commit secrets or generated request/response logs.
+Push the repository and wait for all CI jobs. npm trusted publishing is configured
+from an existing package's settings. For a new package, first publish the checked
+0.1.0 build interactively from your own npm account with npm login and npm publish
+--access public. Review npm pack --dry-run before publishing. Do not upload npm
+credentials to GitHub. This first local publication does not carry Actions OIDC
+provenance; future CI publications do.
 
-## Before each release
+After the package exists, add a GitHub trusted publisher in its npm settings:
+owner zahidhasann88, repository mockline, workflow release.yml, environment npm.
+Allow npm publish. Create the npm GitHub environment and repository variable
+PUBLISH_TO_NPM=true. The workflow uses Node 22 and npm 11 with id-token: write.
+See https://docs.npmjs.com/trusted-publishers/ for current registry requirements.
 
-```sh
-corepack pnpm install --frozen-lockfile
-corepack pnpm schema:config
-corepack pnpm format:check
-corepack pnpm lint
-corepack pnpm typecheck
-corepack pnpm test
-corepack pnpm build
-corepack pnpm publint
-corepack pnpm attw
-corepack pnpm pack:check
-```
+GHCR publication is separate: enable repository variable PUBLISH_DOCKER=true
+only when ready. The image is ghcr.io/zahidhasann88/mockline. GitHub release
+assets are created independently of npm/GHCR publication.
 
-Review the test coverage output, `npm pack` contents, `CHANGELOG.md`, config
-schema, and Docker build. Update `package.json`'s version and changelog, commit,
-then create and push a matching `v<version>` tag. The tag triggers CI checks;
-after they pass, the release workflow publishes npm provenance, creates the
-GitHub Release, and pushes the GHCR image. Publishing requires the one-time npm
-trusted-publisher configuration above; this template intentionally has no
-registry token.
+## Each release
+
+Run the checks documented in CONTRIBUTING.md. Regenerate the config schema,
+review tarball contents, update package.json and CHANGELOG.md, commit and push.
+Only after main CI passes, push a matching annotated v<version> tag. Release
+checks validate the tag/version before publishing and test the tagged checkout.
+An existing npm version is skipped on retries. Manual dispatch accepts an
+existing tag; it never changes where that tag points. Never move a published tag.

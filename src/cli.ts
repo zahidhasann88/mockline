@@ -347,7 +347,11 @@ async function startServing(specPath: string, options: CliOptions): Promise<void
     },
   });
   logger.info(`Mock API listening at ${server.url}`);
-  if (options.quiet !== true) logger.info(`Inspector: ${server.url}/__mockline/health`);
+  if (
+    options.quiet !== true &&
+    (config.inspector.enabled ?? ['127.0.0.1', 'localhost', '::1'].includes(config.host))
+  )
+    logger.info(`Inspector: ${server.url}/__mockline/health`);
   let stopping = false;
   const stop = (): void => {
     if (stopping) return;

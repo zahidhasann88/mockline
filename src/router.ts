@@ -115,7 +115,10 @@ function combineParameters(pathItem: ApiPathItem, operation: ApiOperation): ApiP
   const merged = new Map<string, ApiParameter>();
   for (const parameter of [...(pathItem.parameters ?? []), ...(operation.parameters ?? [])]) {
     if (parameter && typeof parameter.name === 'string' && typeof parameter.in === 'string') {
-      merged.set(`${parameter.in}:${parameter.name.toLowerCase()}`, parameter);
+      merged.set(
+        `${parameter.in}:${parameter.in === 'header' ? parameter.name.toLowerCase() : parameter.name}`,
+        parameter,
+      );
     }
   }
   return [...merged.values()];

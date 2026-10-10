@@ -148,7 +148,7 @@ export async function loadSpec(file: string): Promise<LoadedSpec> {
     const reason = error instanceof Error ? error.message : String(error);
     throw new MocklineError(`Invalid OpenAPI spec ${file}: ${reason}`, 1, error);
   }
-  const document = parsed as OpenApiDocument;
+  const document = dereferenced;
   const warnings = inspectSpec(document);
   return { file: absoluteFile, document, dereferenced, warnings };
 }

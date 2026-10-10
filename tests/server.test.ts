@@ -162,6 +162,23 @@ describe('programmatic mock server', () => {
       await fetch(`${server.url}/__mockline/reset`, { method: 'POST' });
       expect(await (await fetch(`${server.url}/v1/pets`)).json()).toHaveLength(2);
 
+      server.setOverride('createPet', { status: 202, body: { queued: true } });
+      const overriddenCreate = await fetch(`${server.url}/v1/pets`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ name: 'Not stored' }),
+      });
+      expect(overriddenCreate.status).toBe(202);
+      expect(await (await fetch(`${server.url}/v1/pets`)).json()).toHaveLength(2);
+
+      const forced = await fetch(`${server.url}/v1/pets`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', 'x-mockline-status': '404' },
+        body: JSON.stringify({ name: 'Not stored either' }),
+      });
+      expect(forced.status).toBe(404);
+      expect(await (await fetch(`${server.url}/v1/pets`)).json()).toHaveLength(2);
+
       server.setOverride('listPets', { status: 202, body: { overridden: true } });
       const overridden = await fetch(`${server.url}/v1/pets`);
       expect(overridden.status).toBe(202);

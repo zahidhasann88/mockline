@@ -9,14 +9,20 @@ export function defaultStatus(responses: Record<string, ApiResponse> | undefined
     .sort((a, b) => Number(a) - Number(b));
   if (success[0]) return success[0];
   if (responses.default) return 'default';
-  return Object.keys(responses).sort()[0] ?? '200';
+  return '200';
 }
 
 function hasExample(response: ApiResponse | undefined): boolean {
   if (!response?.content) return false;
   return Object.values(response.content).some(
     (media) =>
-      'example' in media || Boolean(media.examples && Object.keys(media.examples).length > 0),
+      'example' in media ||
+      Boolean(media.examples && Object.keys(media.examples).length > 0) ||
+      Boolean(
+        media.schema &&
+        ('example' in media.schema ||
+          (Array.isArray(media.schema.examples) && media.schema.examples.length > 0)),
+      ),
   );
 }
 

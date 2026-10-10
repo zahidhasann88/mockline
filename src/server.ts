@@ -513,7 +513,7 @@ export async function createMockServer(options: CreateMockServerOptions): Promis
                 const counter = requestCounters.get(key) ?? 0;
                 requestCounters.set(key, counter + 1);
                 const stateResponse = config.stateful.enabled
-                  ? stateStoreState.current.handle(route, match.params, url, body)
+                  ? () => stateStoreState.current.handle(match.route, match.params, url, body)
                   : undefined;
                 const selected = selectResponse({
                   root: specState.current.document,

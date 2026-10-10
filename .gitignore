@@ -11,3 +11,11 @@ coverage/
 *.tsbuildinfo
 mockline-records.jsonl
 .env*
+
+# Local review and demo files
+build-docs.txt
+build-report.txt
+PUBLISHING.md
+VERIFICATION.md
+demo-output/
+.env.*

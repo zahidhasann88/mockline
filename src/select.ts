@@ -26,7 +26,7 @@ export interface SelectionInput {
   body: unknown;
   requestCounter?: number;
   sequenceIndexes?: ReadonlyMap<string, number>;
-  stateResponse?: MockResponse;
+  stateResponse?: MockResponse | (() => MockResponse | undefined);
 }
 
 export interface SelectionResult {
@@ -462,12 +462,25 @@ export function selectResponse(input: SelectionInput): SelectionResult {
         ...(value.delay !== undefined ? { delay: value.delay } : {}),
         source: 'override',
       };
-    } else if (input.stateResponse) {
-      response = input.stateResponse;
     } else {
-      const selected = responseWithStatusAndMedia(input, undefined, undefined, false, seed);
-      response = selected.response;
-      warnings = selected.warnings;
+      const failurePending = injectedFailure(200, seed, input, false);
+      const acceptsState =
+        applyAcceptNegotiation(input, {
+          status: Number(defaultStatus(input.route.operation.responses)) || 200,
+          source: 'state',
+        }).status !== 406;
+      const stateResponse =
+        !failurePending && acceptsState
+          ? typeof input.stateResponse === 'function'
+            ? input.stateResponse()
+            : input.stateResponse
+          : undefined;
+      if (stateResponse) response = stateResponse;
+      else {
+        const selected = responseWithStatusAndMedia(input, undefined, undefined, false, seed);
+        response = selected.response;
+        warnings = selected.warnings;
+      }
     }
   }
   const failure = injectedFailure(response.status, seed, input, controls.forceError);

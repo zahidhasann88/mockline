@@ -1,4 +1,4 @@
-import { createMockServer } from '@your-github-username/mockline';
+import { createMockServer } from '@zahidhasann/mockline';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 

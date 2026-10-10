@@ -1,12 +1,12 @@
 {
-  "name": "@your-github-username/mockline",
+  "name": "@zahidhasann/mockline",
   "version": "0.1.0",
   "description": "A local mock API server and TypeScript library powered by OpenAPI.",
   "license": "MIT",
   "type": "module",
   "sideEffects": false,
   "engines": {
-    "node": ">=20"
+    "node": "\u003e=20"
   },
   "packageManager": "pnpm@9.15.9",
   "bin": {
@@ -36,12 +36,12 @@
   ],
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/YOUR_GITHUB_USERNAME/mockline.git"
+    "url": "git+https://github.com/zahidhasann88/mockline.git"
   },
   "bugs": {
-    "url": "https://github.com/YOUR_GITHUB_USERNAME/mockline/issues"
+    "url": "https://github.com/zahidhasann88/mockline/issues"
   },
-  "homepage": "https://github.com/YOUR_GITHUB_USERNAME/mockline#readme",
+  "homepage": "https://github.com/zahidhasann88/mockline#readme",
   "keywords": [
     "openapi",
     "mock-server",
@@ -56,18 +56,19 @@
   },
   "scripts": {
     "build": "tsup",
-    "clean": "rm -rf dist coverage",
+    "clean": "node -e \"for (const p of [\u0027dist\u0027, \u0027coverage\u0027]) require(\u0027node:fs\u0027).rmSync(p, { recursive: true, force: true })\"",
     "lint": "eslint src tests scripts *.ts eslint.config.js",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "typecheck": "tsc --noEmit",
-    "test": "tsup && vitest run --coverage",
+    "test": "tsup \u0026\u0026 vitest run --coverage",
     "test:watch": "vitest",
     "schema:config": "tsx scripts/generate-config-schema.ts",
     "publint": "publint",
     "attw": "attw --pack --profile esm-only",
     "benchmark": "tsx scripts/benchmark.ts",
-    "pack:check": "tsup && node scripts/verify-pack.mjs"
+    "pack:check": "tsup \u0026\u0026 node scripts/verify-pack.mjs",
+    "demo": "pnpm build \u0026\u0026 node scripts/demo.mjs"
   },
   "dependencies": {
     "@apidevtools/swagger-parser": "^12.1.0",
@@ -94,5 +95,6 @@
     "typescript-eslint": "^8.31.0",
     "vitest": "^3.1.4",
     "zod-to-json-schema": "^3.24.5"
-  }
+  },
+  "author": "Zahid Hasan \u003cjahidhasann67@gmail.com\u003e"
 }

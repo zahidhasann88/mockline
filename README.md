@@ -5,12 +5,8 @@ an OpenAPI 3 document to serve documented routes, choose examples or generate
 schema-conforming responses, validate requests, and optionally keep CRUD state
 in memory. It uses Node's built-in HTTP server and binds to loopback by default.
 
-> **Package name note:** the unscoped npm package name `mockline` is already
-> registered. This repository therefore uses `@your-github-username/mockline`
-> while keeping the executable name `mockline`. Replace `your-github-username`
-> with the publisher's lowercase npm/GitHub scope before publishing; do not
-> publish under the unscoped name. The GitHub URLs and MIT copyright holder in
-> this template are placeholders too.
+> **npm package:** `@zahidhasann/mockline`. The unscoped name is already taken;
+> the command is still `mockline`. Use the local build until the first release.
 
 ## Highlights
 
@@ -40,10 +36,10 @@ Mockline is for local development, tests, and demos—not production traffic.
 - pnpm 9 for working from this repository; npm can be used to install a
   published package.
 
-After the package scope has been changed and the package has been published:
+After the first npm release:
 
 ```sh
-npm install --global @your-github-username/mockline
+npm install --global @zahidhasann/mockline
 mockline --help
 ```
 
@@ -147,6 +143,9 @@ discriminators, and recursive references with a depth limit. Unsupported or
 non-JSON response media types need explicit examples; otherwise the server
 returns a clear `501` response and `mockline validate` reports a warning.
 
+See [response behavior](docs/behavior.md), [generation](docs/generation.md), and
+[stateful limitations](docs/stateful.md) for the precise rules.
+
 ## Configuration
 
 `mockline init` creates a commented `mockline.yaml`. A complete schema is in
@@ -201,7 +200,7 @@ passwords, scopes, or certificates and is not an authorization system.
 ## Programmatic API
 
 ```ts
-import { createMockServer } from '@your-github-username/mockline';
+import { createMockServer } from '@zahidhasann/mockline';
 
 const server = await createMockServer({
   spec: './openapi.yaml',
@@ -230,6 +229,23 @@ the request history.
 
 See [`examples/programmatic.ts`](examples/programmatic.ts); the package includes
 declarations for the complete typed API.
+
+A Vitest test can assert recorded requests without a global server:
+
+```ts
+import { expect, it } from 'vitest';
+import { createMockServer } from '@zahidhasann/mockline';
+
+it('records a request', async () => {
+  const server = await createMockServer({ spec: './openapi.yaml', port: 0 });
+  try {
+    await fetch(`${server.url}/pets`);
+    expect(server.requests({ method: 'GET' })).toHaveLength(1);
+  } finally {
+    await server.close();
+  }
+});
+```
 
 ## Inspector and recording
 
@@ -277,15 +293,43 @@ optional and does not change the default local mock behavior.
 
 ```sh
 docker build -t mockline .
-docker run --rm -p 4010:4010 \
+docker run --rm -p 127.0.0.1:4010:4010 \
   -v "$PWD/examples/petstore:/data:ro" \
-  mockline serve /data/openapi.yaml --host 0.0.0.0 --port 4010
+  mockline serve /data/openapi.yaml --host 0.0.0.0 --port 4010 --inspector
 ```
 
 The image runs as an unprivileged user and exposes port 4010. It does not start a
 server by default. Inside a container, bind to `0.0.0.0` to make the port
 reachable through Docker; publish only on trusted interfaces and do not enable
 the inspector on an untrusted network.
+
+## Related tools and limits
+
+[Prism](https://github.com/stoplightio/prism) also mocks HTTP APIs from OpenAPI.
+[MSW](https://mswjs.io/) defines request handlers for browser and Node tests.
+[json-server](https://github.com/typicode/json-server) serves REST resources from
+JSON data. Mockline combines OpenAPI-driven HTTP responses with a typed server
+API, request inspection and a small in-memory CRUD store.
+
+Swagger 2.0, GraphQL, WebSockets, callbacks and webhooks are unsupported. XML
+and other non-JSON media require examples. Complex schemas may validate as a
+spec but fail automatic generation; see [generation limits](docs/generation.md).
+
+## Roadmap
+
+- Broaden pattern/composition generation and constrained stateful ID handling.
+- Add richer media serialization and parameter styles.
+- Expand reload support to watch referenced specification files.
+
+## Local demo
+
+```sh
+pnpm demo
+```
+
+This builds the CLI and exercises examples, seeded generation, forced status,
+latency, strict validation, CRUD, redaction and guarded local proxying. It closes
+its servers automatically and saves output in ignored demo-output/.
 
 ## Development and release checks
 
@@ -307,9 +351,9 @@ The test suite covers Node.js 20 and 22 in CI. See
 [`docs/benchmark.md`](docs/benchmark.md) for the benchmark method and sample
 results, and [`CONTRIBUTING.md`](CONTRIBUTING.md) for project conventions.
 
-Before the first release, update the package scope, GitHub URLs, LICENSE
-copyright holder, npm trusted-publishing settings, and GHCR repository details.
-The release workflow is tag-driven (`v*`), publishes npm provenance using
-GitHub Actions OIDC (no long-lived npm token), creates a GitHub release, and
-publishes a GHCR image. See the release checklist in
+Before the first release, confirm the npm account owns `@zahidhasann` and
+follow the initial publication steps. The tag-driven workflow validates the
+version, creates a GitHub release, and optionally publishes npm/GHCR when their
+repository variables are enabled. Subsequent npm releases use trusted publishing
+with GitHub Actions OIDC. See the release checklist in
 [`docs/release.md`](docs/release.md).

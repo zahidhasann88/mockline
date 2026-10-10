@@ -1,5 +1,6 @@
 import { performance } from 'node:perf_hooks';
 import { resolve } from 'node:path';
+import { cpus, totalmem } from 'node:os';
 import { createMockServer } from '../src/server.js';
 import type { Logger } from '../src/logger.js';
 
@@ -26,12 +27,15 @@ async function main(): Promise<void> {
   if (!Number.isInteger(concurrency)) {
     throw new Error('--concurrency must be a positive integer.');
   }
+  const prefer = process.argv.includes('--generate') ? 'generate' : 'example';
   const server = await createMockServer({
     spec: resolve('examples/petstore/openapi.yaml'),
     host: '127.0.0.1',
     port: 0,
     config: {
       validate: 'off',
+      prefer,
+      seed: 42,
       recording: { enabled: false },
       inspector: { enabled: false },
     },
@@ -69,6 +73,9 @@ async function main(): Promise<void> {
   const requestsPerSecond = elapsedMs > 0 ? requests / (elapsedMs / 1000) : 0;
   console.log(
     `Mockline loopback benchmark (${process.version}, ${process.platform}/${process.arch})`,
+  );
+  console.log(
+    `CPU: ${cpus()[0]?.model ?? 'unknown'} | RAM: ${(totalmem() / 1024 ** 3).toFixed(1)} GiB | Response: ${prefer}`,
   );
   console.log(
     `Duration: ${(elapsedMs / 1000).toFixed(2)}s | Concurrency: ${concurrency} | Route: GET /v1/pets`,

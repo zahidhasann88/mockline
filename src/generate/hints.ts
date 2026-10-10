@@ -7,6 +7,7 @@ export type GenerationHints = Record<string, HintValue | readonly HintValue[]>;
 export function createFaker(seed: number): Faker {
   const faker = new Faker({ locale: [en] });
   faker.seed(seed);
+  faker.setDefaultRefDate('2020-01-01T00:00:00.000Z');
   return faker;
 }
 

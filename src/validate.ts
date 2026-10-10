@@ -318,7 +318,7 @@ function validateBody(input: RequestValidationInput): {
   const bodySchema = isRecord(mediaObject?.schema) ? (mediaObject.schema as JsonSchema) : undefined;
   if (!selectedType || !bodySchema) return { issues, bodyInvalid: issues.length > 0 };
   const root = requestRootWithoutReadOnly(input.root);
-  const validation = validateSchema(root, bodySchema, input.body);
+  const validation = validateSchema(root, stripReadOnly(bodySchema) as JsonSchema, input.body);
   issues.push(...validation.errors.map((error) => formatAjvIssue(error, '/body')));
   return { issues, bodyInvalid: !validation.valid || issues.length > 0 };
 }

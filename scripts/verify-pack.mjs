@@ -12,11 +12,15 @@ const packDirectory = join(scratch, 'pack');
 const installDirectory = join(scratch, 'install');
 
 function run(label, command, args, cwd) {
-  const result = spawnSync(command, args, {
+  const executable = process.platform === 'win32' && command === 'npm' ? 'npm.cmd' : command;
+  const commandArgs = executable.endsWith('.cmd')
+    ? args.map((arg) => `"${arg.replaceAll('"', '""')}"`)
+    : args;
+  const result = spawnSync(executable, commandArgs, {
     cwd,
     encoding: 'utf8',
     maxBuffer: 8 * 1024 * 1024,
-    shell: process.platform === 'win32' && command.endsWith('.cmd'),
+    shell: process.platform === 'win32' && executable.endsWith('.cmd'),
   });
   if (result.error) throw new Error(`${label}: ${result.error.message}`);
   if (result.status !== 0) {

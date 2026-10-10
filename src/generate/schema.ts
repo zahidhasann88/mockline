@@ -327,8 +327,11 @@ function generateNumber(
   }
   const minimumValue = schema.minimum;
   const maximumValue = schema.maximum;
-  let minimum = typeof minimumValue === 'number' ? minimumValue : -100;
-  let maximum = typeof maximumValue === 'number' ? maximumValue : 100;
+  let minimum =
+    typeof minimumValue === 'number'
+      ? minimumValue
+      : Math.min(-100, numberValue(maximumValue, 100) - 200);
+  let maximum = typeof maximumValue === 'number' ? maximumValue : Math.max(100, minimum + 200);
   if (schema.exclusiveMinimum === true && typeof minimumValue === 'number')
     minimum += type === 'integer' ? 1 : 0.000001;
   else if (typeof schema.exclusiveMinimum === 'number')
@@ -478,6 +481,9 @@ function generateNode(
   depth: number,
   propertyName: string,
 ): unknown {
+  if (depth > context.maxDepth + 8) {
+    throw new Error('Recursive schema has no finite value within the generation depth limit.');
+  }
   let schema = resolveSchema(rawSchema, context);
   if (rawSchema.$ref && context.refTrail.has(rawSchema.$ref)) {
     if (depth >= context.maxDepth) {
@@ -493,8 +499,8 @@ function generateNode(
       if (type === 'array')
         return numberValue(resolved.minItems, 0) === 0
           ? []
-          : generateArray(resolved, context, context.maxDepth, propertyName);
-      if (type === 'object') return generateObject(resolved, context, context.maxDepth);
+          : generateArray(resolved, context, depth, propertyName);
+      if (type === 'object') return generateObject(resolved, context, depth);
       if (type === 'integer' || type === 'number')
         return generateNumber(resolved, context, type, propertyName);
       if (type === 'boolean') return context.rng.bool();
@@ -620,7 +626,7 @@ export function generateFromSchema(
     last = generateNode(schema, context, 0, '');
     warnings.push(...context.warnings);
     const validation = validateSchema(validationRoot, validationSchema, last);
-    if (validation.valid || (Object.keys(validationRoot).length === 0 && !schema.$ref)) {
+    if (validation.valid) {
       return { value: last, warnings: dedupeWarnings(warnings) };
     }
   }

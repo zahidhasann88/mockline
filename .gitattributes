@@ -1,0 +1,6 @@
+* text=auto
+*.ts text eol=lf
+*.mjs text eol=lf
+*.yml text eol=lf
+*.yaml text eol=lf
+pnpm-lock.yaml text eol=lf

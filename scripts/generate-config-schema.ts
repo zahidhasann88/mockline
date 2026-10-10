@@ -7,7 +7,7 @@ const schema = zodToJsonSchema(configSchema, {
   $refStrategy: 'none',
   target: 'jsonSchema7',
 });
-schema.$schema = 'https://json-schema.org/draft/2020-12/schema';
+schema.$schema = 'http://json-schema.org/draft-07/schema#';
 schema.title = 'Mockline configuration';
 schema.description = 'Configuration accepted by Mockline CLI and library.';
 await mkdir('docs', { recursive: true });

@@ -15,5 +15,6 @@ COPY --from=build --chown=node:node /app/dist ./dist
 COPY --from=build --chown=node:node /app/docs/config.schema.json ./docs/config.schema.json
 USER node
 EXPOSE 4010
+HEALTHCHECK --interval=30s --timeout=5s --start-period=5s CMD node -e "fetch('http://127.0.0.1:4010/__mockline/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
 ENTRYPOINT ["node", "/app/dist/cli.js"]
 CMD ["--help"]

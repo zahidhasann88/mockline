@@ -1,0 +1,24 @@
+name: Mock API example
+on: workflow_dispatch
+permissions:
+  contents: read
+jobs:
+  e2e:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Start Mockline (after its first npm release)
+        run: |
+          npm install --global @zahidhasann/mockline@0.1.0
+          mockline serve examples/petstore/openapi.yaml --port 4010 --seed 42 > mockline.log 2>&1 &
+          for attempt in $(seq 1 30); do
+            if curl --fail --silent http://127.0.0.1:4010/__mockline/health; then exit 0; fi
+            sleep 1
+          done
+          cat mockline.log
+          exit 1
+      - name: Check the example route
+        run: curl --fail http://127.0.0.1:4010/v1/pets

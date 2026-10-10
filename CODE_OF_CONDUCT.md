@@ -17,5 +17,4 @@ attacks, and publishing another person's private information without consent.
 ## Enforcement
 
 Project maintainers are responsible for clarifying and enforcing these standards.
-Report unacceptable behavior privately to the repository owner listed in the
-GitHub repository. Reports will be reviewed and handled fairly and confidentially.
+Report unacceptable behavior privately to jahidhasann67@gmail.com. Reports will be reviewed and handled fairly and confidentially.

@@ -1,5 +1,6 @@
 import Ajv, { type ErrorObject, type ValidateFunction } from 'ajv';
 import addFormats from 'ajv-formats';
+import Ajv2020 from 'ajv/dist/2020.js';
 import type { JsonSchema, OpenApiDocument } from './types.js';
 
 const ROOT_ID = 'https://mockline.local/openapi.json';
@@ -18,6 +19,8 @@ function cloneSchema(
   for (const [key, child] of Object.entries(value)) {
     if (key === '$ref' && typeof child === 'string' && child.startsWith('#/')) {
       output[key] = `${rootId}${child}`;
+    } else if ((key === 'exclusiveMinimum' || key === 'exclusiveMaximum') && child === false) {
+      continue;
     } else if (key === 'exclusiveMinimum' && child === true) {
       // OpenAPI 3.0 encodes exclusivity as a boolean beside minimum.
       const parent = value as Record<string, unknown>;
@@ -42,7 +45,8 @@ export interface SchemaValidation {
 }
 
 export function createValidator(root: OpenApiDocument, schema: JsonSchema): ValidateFunction {
-  const ajv = new Ajv({
+  const Validator = root.openapi?.startsWith('3.1') ? Ajv2020 : Ajv;
+  const ajv = new Validator({
     allErrors: true,
     strict: false,
     allowUnionTypes: true,
@@ -50,7 +54,7 @@ export function createValidator(root: OpenApiDocument, schema: JsonSchema): Vali
   });
   addFormats(ajv);
   try {
-    ajv.addSchema(root, ROOT_ID);
+    ajv.addSchema(cloneSchema(root, ROOT_ID) as JsonSchema, ROOT_ID);
   } catch {
     // The root may have already been registered under a conflicting schema key in a caller-owned instance.
   }

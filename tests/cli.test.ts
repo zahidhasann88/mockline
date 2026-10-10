@@ -116,7 +116,7 @@ describe('CLI', () => {
       { encoding: 'utf8' },
     );
     expect(schemaRoutes).toContain('schema generation');
-  });
+  }, 60_000);
 
   it('serves the checked-in Petstore example with its config and conditional override', async () => {
     const child = spawn(

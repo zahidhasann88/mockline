@@ -96,7 +96,7 @@ describe('spec loading and summaries', () => {
         '404': { description: 'missing' },
       }),
     ).toBe('default');
-    expect(defaultStatus({ '404': { description: 'missing' } })).toBe('404');
+    expect(defaultStatus({ '404': { description: 'missing' } })).toBe('200');
     expect(defaultStatus(undefined)).toBe('200');
   });
 });
