@@ -52,7 +52,7 @@
   "scripts": {
     "build": "tsup",
     "clean": "rm -rf dist coverage",
-    "lint": "eslint .",
+    "lint": "eslint src scripts *.ts eslint.config.js",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "typecheck": "tsc --noEmit",
