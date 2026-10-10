@@ -1,0 +1,8 @@
+node_modules/
+dist/
+coverage/
+.npm/
+*.log
+.DS_Store
+mockline-records.jsonl
+.env*
