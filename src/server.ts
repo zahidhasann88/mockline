@@ -8,6 +8,7 @@ import { loadSpec, type LoadedSpec } from './spec/load.js';
 import { createRouter, normalizePath, type Router } from './router.js';
 import { selectResponse } from './select.js';
 import { RequestRecorder } from './record.js';
+import { handleInspector } from './inspector.js';
 import { checkSecurityPresence, strictValidationStatus, validateRequest, type ValidationIssue } from './validate.js';
 import type { JsonValue, MatchedRoute, MockResponse, RecordedRequest, RequestFilter, ResponseSource } from './types.js';
 
@@ -220,6 +221,11 @@ export async function createMockServer(options: CreateMockServerOptions): Promis
   const recorder = new RequestRecorder(config, options.clock);
   const requestCounters = new Map<string, number>();
   const sequenceIndexes = new Map<string, number>();
+  const startedAt = options.clock?.() ?? new Date();
+  const resetRuntime = async (): Promise<void> => {
+    requestCounters.clear();
+    sequenceIndexes.clear();
+  };
   let closing = false;
   const handler = async (req: IncomingMessage, res: ServerResponse): Promise<void> => {
     const started = (options.clock ?? (() => new Date()))().getTime();
@@ -247,7 +253,17 @@ export async function createMockServer(options: CreateMockServerOptions): Promis
 
     try {
       if (pathname.startsWith('/__mockline')) {
-        response = problemResponse(404, 'Not Found', 'The inspector API is unavailable or disabled.');
+        const inspectorResponse = await handleInspector(method, url, {
+          enabled: inspectorEnabled,
+          recorder,
+          config,
+          spec,
+          startedAt,
+          reset: resetRuntime,
+        });
+        response = inspectorResponse
+          ? { status: inspectorResponse.status, ...(inspectorResponse.body !== undefined ? { body: inspectorResponse.body } : {}), ...(inspectorResponse.headers ? { headers: inspectorResponse.headers } : {}), source: 'generated' }
+          : problemResponse(404, 'Not Found', 'The inspector endpoint does not exist.');
         source = 'inspector';
       } else if (method === 'OPTIONS' && config.cors.enabled && req.headers['access-control-request-method']) {
         response = { status: 204, source: 'generated' };
@@ -407,8 +423,7 @@ export async function createMockServer(options: CreateMockServerOptions): Promis
     url,
     requests,
     async reset() {
-      requestCounters.clear();
-      sequenceIndexes.clear();
+      await resetRuntime();
     },
     setOverride(key, override) {
       const parsed = configSchema.parse({ overrides: { [key]: override } }).overrides[key];
