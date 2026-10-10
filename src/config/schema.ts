@@ -32,14 +32,26 @@ const latencySchema = z.union([
   z.tuple([nonNegative, nonNegative]).refine(([min, max]) => min <= max, {
     message: 'range minimum must not exceed maximum',
   }),
-  z.object({
-    fixed: nonNegative.optional(),
-    min: nonNegative.optional(),
-    max: nonNegative.optional(),
-    distribution: z.enum(['uniform', 'normal']).default('uniform'),
-  }).refine((value) => value.fixed !== undefined || (value.min !== undefined && value.max !== undefined), {
-    message: 'provide fixed or both min and max',
-  }),
+  z
+    .object({
+      fixed: nonNegative.optional(),
+      min: nonNegative.optional(),
+      max: nonNegative.optional(),
+      distribution: z.enum(['uniform', 'normal']).default('uniform'),
+    })
+    .refine(
+      (value) => value.fixed !== undefined || (value.min !== undefined && value.max !== undefined),
+      {
+        message: 'provide fixed or both min and max',
+      },
+    )
+    .refine(
+      (value) => value.min === undefined || value.max === undefined || value.min <= value.max,
+      {
+        message: 'range minimum must not exceed maximum',
+        path: ['min'],
+      },
+    ),
 ]);
 
 export const configSchema = z.object({
@@ -48,45 +60,83 @@ export const configSchema = z.object({
   seed: z.number().int().optional(),
   prefer: z.enum(['example', 'generate']).default('example'),
   latency: latencySchema.default(0),
-  errors: z.object({
-    rate: z.number().min(0).max(1).default(0),
-    statuses: z.array(z.number().int().min(400).max(599)).min(1).default([500, 503]),
-    perOperationRates: z.record(z.number().min(0).max(1)).default({}),
-  }).default({}),
+  errors: z
+    .object({
+      rate: z.number().min(0).max(1).default(0),
+      statuses: z.array(z.number().int().min(400).max(599)).min(1).default([500, 503]),
+      perOperationRates: z.record(z.number().min(0).max(1)).default({}),
+    })
+    .default({}),
   validate: z.enum(['off', 'warn', 'strict']).default('warn'),
-  stateful: z.object({
-    enabled: z.boolean().default(false),
-    seedItems: z.number().int().min(0).default(3),
-    idProperty: z.string().min(1).default('id'),
-    sequenceLoop: z.boolean().default(false),
-  }).default({}),
+  stateful: z
+    .object({
+      enabled: z.boolean().default(false),
+      seedItems: z.number().int().min(0).default(3),
+      idProperty: z.string().min(1).default('id'),
+    })
+    .default({}),
   overrides: z.record(overrideSchema).default({}),
-  proxy: z.object({
-    url: z.string().url().refine((value) => /^https?:\/\//i.test(value), { message: 'must use http or https' }).optional(),
-    all: z.boolean().default(false),
-    allowPrivate: z.boolean().default(false),
-    timeoutMs: z.number().int().positive().default(5000),
-    recordFile: z.string().optional(),
-  }).refine((value) => !value.all || Boolean(value.url), { message: 'proxy.url is required when proxy.all is true', path: ['url'] }).default({}),
-  cors: z.object({
-    enabled: z.boolean().default(true),
-    origins: z.array(z.string()).default(['*']),
-  }).default({}),
-  recording: z.object({
-    enabled: z.boolean().default(true),
-    file: z.string().optional(),
-    maxRequests: z.number().int().positive().default(500),
-    redactHeaders: z.array(z.string()).default([
-      'authorization', 'cookie', 'set-cookie', 'x-api-key', 'api-key', 'x-auth-token',
-    ]),
-  }).default({}),
-  generation: z.object({
-    hints: z.boolean().default(true),
-    counter: z.boolean().default(false),
-    maxDepth: z.number().int().min(0).max(20).default(3),
-    minArrayItems: z.number().int().min(0).default(1),
-    maxArrayItems: z.number().int().min(0).default(3),
-  }).default({}),
+  proxy: z
+    .object({
+      url: z
+        .string()
+        .url()
+        .refine((value) => /^https?:\/\//i.test(value), {
+          message: 'must use http or https',
+        })
+        .optional(),
+      all: z.boolean().default(false),
+      allowPrivate: z.boolean().default(false),
+      timeoutMs: z.number().int().positive().default(5000),
+      recordFile: z.string().optional(),
+    })
+    .refine((value) => !value.all || Boolean(value.url), {
+      message: 'proxy.url is required when proxy.all is true',
+      path: ['url'],
+    })
+    .default({}),
+  cors: z
+    .object({
+      enabled: z.boolean().default(true),
+      origins: z.array(z.string()).default(['*']),
+    })
+    .default({}),
+  recording: z
+    .object({
+      enabled: z.boolean().default(true),
+      file: z.string().optional(),
+      maxRequests: z.number().int().positive().default(500),
+      redactHeaders: z
+        .array(z.string())
+        .default(['authorization', 'cookie', 'set-cookie', 'x-api-key', 'api-key', 'x-auth-token']),
+    })
+    .default({}),
+  generation: z
+    .object({
+      hints: z
+        .union([
+          z.boolean(),
+          z.record(
+            z.union([
+              z.string(),
+              z.number(),
+              z.boolean(),
+              z.null(),
+              z.array(z.union([z.string(), z.number(), z.boolean(), z.null()])),
+            ]),
+          ),
+        ])
+        .default(true),
+      counter: z.boolean().default(false),
+      maxDepth: z.number().int().min(0).max(20).default(3),
+      minArrayItems: z.number().int().min(0).default(1),
+      maxArrayItems: z.number().int().min(0).default(3),
+    })
+    .refine((value) => value.minArrayItems <= value.maxArrayItems, {
+      message: 'minArrayItems must not exceed maxArrayItems',
+      path: ['minArrayItems'],
+    })
+    .default({}),
   controlHeaders: z.object({ allow: z.boolean().default(true) }).default({}),
   inspector: z.object({ enabled: z.boolean().optional() }).default({}),
   enforceAuth: z.boolean().default(false),
@@ -95,8 +145,10 @@ export const configSchema = z.object({
 });
 
 export type MocklineConfig = z.infer<typeof configSchema>;
-export type OverrideConfig = MocklineConfig['overrides'][string];
+export type OverrideConfig = z.input<typeof overrideSchema>;
+export type NormalizedOverrideConfig = MocklineConfig['overrides'][string];
 export type OverrideResponseConfig = z.infer<typeof responseShape>;
 export type ConditionConfig = z.infer<typeof conditionSchema>;
+export type ConditionInput = z.input<typeof conditionSchema>;
 
 export const defaultConfig: MocklineConfig = configSchema.parse({});

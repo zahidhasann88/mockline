@@ -4,7 +4,13 @@ import { validateSchema } from '../ajv.js';
 import { defaultStatus } from '../spec/summary.js';
 import { problem } from '../errors.js';
 import type { MocklineConfig } from '../config/schema.js';
-import type { MatchedRoute, MockResponse, JsonSchema, OpenApiDocument, UnknownRecord } from '../types.js';
+import type {
+  MatchedRoute,
+  MockResponse,
+  JsonSchema,
+  OpenApiDocument,
+  UnknownRecord,
+} from '../types.js';
 import { detectCollections, type ResourceCollection } from './collections.js';
 import type { Router } from '../router.js';
 
@@ -18,24 +24,37 @@ function isRecord(value: unknown): value is UnknownRecord {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
-function resolveSchema(schema: JsonSchema | undefined, root: OpenApiDocument): JsonSchema | undefined {
+function resolveSchema(
+  schema: JsonSchema | undefined,
+  root: OpenApiDocument,
+): JsonSchema | undefined {
   if (!schema || typeof schema.$ref !== 'string' || !schema.$ref.startsWith('#/')) return schema;
-  const resolved = schema.$ref.slice(2).split('/').reduce<unknown>((current, part) => {
-    const key = part.replace(/~1/g, '/').replace(/~0/g, '~');
-    return isRecord(current) ? current[key] : undefined;
-  }, root);
-  return isRecord(resolved) ? resolved as JsonSchema : schema;
+  const resolved = schema.$ref
+    .slice(2)
+    .split('/')
+    .reduce<unknown>((current, part) => {
+      const key = part.replace(/~1/g, '/').replace(/~0/g, '~');
+      return isRecord(current) ? current[key] : undefined;
+    }, root);
+  return isRecord(resolved) ? (resolved as JsonSchema) : schema;
 }
 
-function mergedProperties(schema: JsonSchema, root: OpenApiDocument, seen = new Set<JsonSchema>()): Record<string, JsonSchema> {
+function mergedProperties(
+  schema: JsonSchema,
+  root: OpenApiDocument,
+  seen = new Set<JsonSchema>(),
+): Record<string, JsonSchema> {
   if (seen.has(schema)) return {};
   seen.add(schema);
   const resolved = resolveSchema(schema, root) ?? schema;
-  const properties = isRecord(resolved.properties) ? resolved.properties as Record<string, JsonSchema> : {};
+  const properties = isRecord(resolved.properties)
+    ? (resolved.properties as Record<string, JsonSchema>)
+    : {};
   const merged: Record<string, JsonSchema> = { ...properties };
   if (Array.isArray(resolved.allOf)) {
     for (const branch of resolved.allOf) {
-      if (isRecord(branch)) Object.assign(merged, mergedProperties(branch as JsonSchema, root, seen));
+      if (isRecord(branch))
+        Object.assign(merged, mergedProperties(branch as JsonSchema, root, seen));
     }
   }
   return merged;
@@ -47,7 +66,11 @@ function defaultSuccessStatus(route: MatchedRoute): number {
   return Number.isInteger(status) ? status : 200;
 }
 
-function asResponse(status: number, body: unknown, contentType = 'application/json; charset=utf-8'): MockResponse {
+function asResponse(
+  status: number,
+  body: unknown,
+  contentType = 'application/json; charset=utf-8',
+): MockResponse {
   return { status, body, headers: { 'content-type': contentType }, source: 'state' };
 }
 
@@ -55,7 +78,11 @@ function parseId(value: unknown): string {
   return String(value);
 }
 
-function cleanResponseFields(item: Record<string, unknown>, definition: ResourceCollection, root: OpenApiDocument): Record<string, unknown> {
+function cleanResponseFields(
+  item: Record<string, unknown>,
+  definition: ResourceCollection,
+  root: OpenApiDocument,
+): Record<string, unknown> {
   const properties = mergedProperties(definition.itemSchema, root);
   const output: Record<string, unknown> = { ...item };
   for (const [name, schema] of Object.entries(properties)) {
@@ -70,7 +97,10 @@ export class ResourceStore {
   private seed: number;
   private config: MocklineConfig;
   private readonly data = new Map<string, CollectionState>();
-  private readonly routeIndex = new Map<string, { state: CollectionState; kind: 'list' | 'create' | 'item'; route: MatchedRoute }>();
+  private readonly routeIndex = new Map<
+    string,
+    { state: CollectionState; kind: 'list' | 'create' | 'item'; route: MatchedRoute }
+  >();
 
   constructor(router: Router, root: OpenApiDocument, config: MocklineConfig) {
     this.root = root;
@@ -80,8 +110,16 @@ export class ResourceStore {
     for (const definition of this.collections) {
       const state: CollectionState = { definition, items: [], nextNumericId: 1 };
       this.data.set(definition.path, state);
-      this.routeIndex.set(`${definition.listRoute.method} ${definition.listRoute.path}`, { state, kind: 'list', route: definition.listRoute });
-      this.routeIndex.set(`${definition.createRoute.method} ${definition.createRoute.path}`, { state, kind: 'create', route: definition.createRoute });
+      this.routeIndex.set(`${definition.listRoute.method} ${definition.listRoute.path}`, {
+        state,
+        kind: 'list',
+        route: definition.listRoute,
+      });
+      this.routeIndex.set(`${definition.createRoute.method} ${definition.createRoute.path}`, {
+        state,
+        kind: 'create',
+        route: definition.createRoute,
+      });
       for (const [method, route] of definition.itemRoutes) {
         this.routeIndex.set(`${method} ${route.path}`, { state, kind: 'item', route });
       }
@@ -115,19 +153,28 @@ export class ResourceStore {
         item[state.definition.idProperty] = assignedId;
         state.items.push(cleanResponseFields(item, state.definition, this.root));
       }
-      const numericIds = state.items.map((item) => item[state.definition.idProperty]).filter((value): value is number => typeof value === 'number' && Number.isFinite(value));
+      const numericIds = state.items
+        .map((item) => item[state.definition.idProperty])
+        .filter((value): value is number => typeof value === 'number' && Number.isFinite(value));
       if (numericIds.length > 0) state.nextNumericId = Math.max(...numericIds) + 1;
     }
   }
 
-  handle(route: MatchedRoute, params: Record<string, string>, url: URL, body: unknown): MockResponse | undefined {
+  handle(
+    route: MatchedRoute,
+    params: Record<string, string>,
+    url: URL,
+    body: unknown,
+  ): MockResponse | undefined {
     const match = this.routeIndex.get(`${route.method} ${route.path}`);
     if (!match) return undefined;
     const { state, kind } = match;
     const definition = state.definition;
     if (kind === 'list') {
       let items = state.items.map((item) => ({ ...item }));
-      const offset = definition.offsetParam ? Math.max(0, Number(url.searchParams.get(definition.offsetParam) ?? 0) || 0) : 0;
+      const offset = definition.offsetParam
+        ? Math.max(0, Number(url.searchParams.get(definition.offsetParam) ?? 0) || 0)
+        : 0;
       const limitRaw = definition.limitParam ? url.searchParams.get(definition.limitParam) : null;
       const limit = limitRaw === null ? undefined : Math.max(0, Number(limitRaw) || 0);
       items = items.slice(offset, limit === undefined ? undefined : offset + limit);
@@ -149,7 +196,12 @@ export class ResourceStore {
         });
         item = isRecord(generated) ? { ...generated } : {};
       }
-      const id = this.ensureId(item, state, deriveSeed(this.seed, route.path, state.items.length, 'create'), false);
+      const id = this.ensureId(
+        item,
+        state,
+        deriveSeed(this.seed, route.path, state.items.length, 'create'),
+        false,
+      );
       item[definition.idProperty] = id;
       const saved = cleanResponseFields(item, definition, this.root);
       state.items.push(saved);
@@ -157,9 +209,21 @@ export class ResourceStore {
     }
 
     const rawId = params[definition.idParam];
-    const index = state.items.findIndex((item) => parseId(item[definition.idProperty]) === String(rawId));
+    const index = state.items.findIndex(
+      (item) => parseId(item[definition.idProperty]) === String(rawId),
+    );
     if (route.method === 'GET') {
-      if (index < 0) return { status: 404, body: problem(404, 'Not Found', `No resource with ${definition.idProperty} ${rawId} exists.`), headers: { 'content-type': 'application/problem+json' }, source: 'state' };
+      if (index < 0)
+        return {
+          status: 404,
+          body: problem(
+            404,
+            'Not Found',
+            `No resource with ${definition.idProperty} ${rawId} exists.`,
+          ),
+          headers: { 'content-type': 'application/problem+json' },
+          source: 'state',
+        };
       return asResponse(defaultSuccessStatus(route), { ...state.items[index] });
     }
     if (route.method === 'DELETE') {
@@ -168,7 +232,17 @@ export class ResourceStore {
       return { status: 204, source: 'state' };
     }
     if (route.method === 'PUT' || route.method === 'PATCH') {
-      if (index < 0) return { status: 404, body: problem(404, 'Not Found', `No resource with ${definition.idProperty} ${rawId} exists.`), headers: { 'content-type': 'application/problem+json' }, source: 'state' };
+      if (index < 0)
+        return {
+          status: 404,
+          body: problem(
+            404,
+            'Not Found',
+            `No resource with ${definition.idProperty} ${rawId} exists.`,
+          ),
+          headers: { 'content-type': 'application/problem+json' },
+          source: 'state',
+        };
       const current = state.items[index] ?? {};
       const replacement = isRecord(body) ? { ...body } : {};
       const item = route.method === 'PATCH' ? { ...current, ...replacement } : replacement;
@@ -179,12 +253,19 @@ export class ResourceStore {
     return undefined;
   }
 
-  private ensureId(item: Record<string, unknown>, state: CollectionState, seed: number, seedItem: boolean): unknown {
+  private ensureId(
+    item: Record<string, unknown>,
+    state: CollectionState,
+    seed: number,
+    seedItem: boolean,
+  ): unknown {
     const definition = state.definition;
     const properties = mergedProperties(definition.itemSchema, this.root);
     const schema = properties[definition.idProperty] ?? { type: 'string' };
     const current = item[definition.idProperty];
-    const duplicate = current !== undefined && state.items.some((existing) => parseId(existing[definition.idProperty]) === parseId(current));
+    const duplicate =
+      current !== undefined &&
+      state.items.some((existing) => parseId(existing[definition.idProperty]) === parseId(current));
     const valid = current !== undefined && validateSchema(this.root, schema, current).valid;
     if (valid && !duplicate) return current;
     for (let attempt = 0; attempt < 50; attempt += 1) {
@@ -200,13 +281,23 @@ export class ResourceStore {
           minArrayItems: 0,
           maxArrayItems: 0,
         });
-        if (typeof candidate === 'string' && !('format' in schema) && !('pattern' in schema) && !('enum' in schema) && !('const' in schema)) {
+        if (
+          typeof candidate === 'string' &&
+          !('format' in schema) &&
+          !('pattern' in schema) &&
+          !('enum' in schema) &&
+          !('const' in schema)
+        ) {
           candidate = seedItem ? candidate : `${candidate}-${state.items.length + 1}`;
         }
       }
-      const alreadyUsed = state.items.some((existing) => parseId(existing[definition.idProperty]) === parseId(candidate));
+      const alreadyUsed = state.items.some(
+        (existing) => parseId(existing[definition.idProperty]) === parseId(candidate),
+      );
       if (!alreadyUsed && validateSchema(this.root, schema, candidate).valid) return candidate;
     }
-    return schema.type === 'integer' || schema.type === 'number' ? state.nextNumericId++ : `${definition.path.replace(/\W/g, '')}-${state.items.length + 1}`;
+    return schema.type === 'integer' || schema.type === 'number'
+      ? state.nextNumericId++
+      : `${definition.path.replace(/\W/g, '')}-${state.items.length + 1}`;
   }
 }

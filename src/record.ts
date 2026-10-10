@@ -12,8 +12,15 @@ function redactHeaders(
   extraRedacted: string[],
 ): Record<string, string | string[]> {
   const redacted = new Set([
-    'authorization', 'cookie', 'set-cookie', 'proxy-authorization', 'x-api-key', 'api-key',
-    'x-auth-token', 'x-access-token', ...extraRedacted.map((name) => name.toLowerCase()),
+    'authorization',
+    'cookie',
+    'set-cookie',
+    'proxy-authorization',
+    'x-api-key',
+    'api-key',
+    'x-auth-token',
+    'x-access-token',
+    ...extraRedacted.map((name) => name.toLowerCase()),
   ]);
   const result: Record<string, string | string[]> = {};
   for (const [name, value] of Object.entries(headers)) {
@@ -61,12 +68,16 @@ export class RequestRecorder {
     if (this.buffer.length >= this.maxRequests) this.buffer.shift();
     this.buffer.push(entry);
     if (this.file) {
-      this.writeQueue = this.writeQueue.then(async () => {
-        await mkdir(dirname(this.file as string), { recursive: true });
-        await appendFile(this.file as string, `${JSON.stringify(entry)}\n`, 'utf8');
-      }).catch((error: unknown) => {
-        console.error(`mockline: could not append request record: ${error instanceof Error ? error.message : String(error)}`);
-      });
+      this.writeQueue = this.writeQueue
+        .then(async () => {
+          await mkdir(dirname(this.file as string), { recursive: true });
+          await appendFile(this.file as string, `${JSON.stringify(entry)}\n`, 'utf8');
+        })
+        .catch((error: unknown) => {
+          console.error(
+            `mockline: could not append request record: ${error instanceof Error ? error.message : String(error)}`,
+          );
+        });
     }
     return cloneRecord(entry);
   }
@@ -85,7 +96,12 @@ export class RequestRecorder {
       if (filter.path && !entry.url.includes(filter.path)) return false;
       if (filter.status !== undefined && entry.responseStatus !== filter.status) return false;
       if (filter.operationId && entry.operationId !== filter.operationId) return false;
-      if (since !== undefined && Number.isFinite(since) && new Date(entry.timestamp).getTime() < since) return false;
+      if (
+        since !== undefined &&
+        Number.isFinite(since) &&
+        new Date(entry.timestamp).getTime() < since
+      )
+        return false;
       return true;
     });
     if (filter.limit !== undefined) entries = filter.limit <= 0 ? [] : entries.slice(-filter.limit);

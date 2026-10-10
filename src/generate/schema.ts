@@ -50,19 +50,24 @@ function stringValue(value: unknown, fallback = ''): string {
 
 function getPointer(root: unknown, pointer: string): unknown {
   if (!pointer.startsWith('#/')) return undefined;
-  return pointer.slice(2).split('/').reduce<unknown>((current, part) => {
-    const key = part.replace(/~1/g, '/').replace(/~0/g, '~');
-    if (Array.isArray(current)) return current[Number(key)];
-    if (isRecord(current)) return current[key];
-    return undefined;
-  }, root);
+  return pointer
+    .slice(2)
+    .split('/')
+    .reduce<unknown>((current, part) => {
+      const key = part.replace(/~1/g, '/').replace(/~0/g, '~');
+      if (Array.isArray(current)) return current[Number(key)];
+      if (isRecord(current)) return current[key];
+      return undefined;
+    }, root);
 }
 
 function resolveSchema(schema: JsonSchema, context: Context): JsonSchema {
   if (typeof schema.$ref !== 'string') return schema;
   const target = getPointer(context.root, schema.$ref);
   if (!isRecord(target)) {
-    context.warnings.push({ message: `Could not resolve schema reference ${schema.$ref}; using an empty value.` });
+    context.warnings.push({
+      message: `Could not resolve schema reference ${schema.$ref}; using an empty value.`,
+    });
     return {};
   }
   return target as JsonSchema;
@@ -70,12 +75,21 @@ function resolveSchema(schema: JsonSchema, context: Context): JsonSchema {
 
 function mergeSchema(left: JsonSchema, right: JsonSchema): JsonSchema {
   const merged: JsonSchema = { ...left, ...right };
-  const leftProperties = isRecord(left.properties) ? left.properties as Record<string, JsonSchema> : {};
-  const rightProperties = isRecord(right.properties) ? right.properties as Record<string, JsonSchema> : {};
+  const leftProperties = isRecord(left.properties)
+    ? (left.properties as Record<string, JsonSchema>)
+    : {};
+  const rightProperties = isRecord(right.properties)
+    ? (right.properties as Record<string, JsonSchema>)
+    : {};
   if (Object.keys(leftProperties).length > 0 || Object.keys(rightProperties).length > 0) {
     merged.properties = { ...leftProperties, ...rightProperties };
   }
-  const required = [...new Set([...(Array.isArray(left.required) ? left.required : []), ...(Array.isArray(right.required) ? right.required : [])])];
+  const required = [
+    ...new Set([
+      ...(Array.isArray(left.required) ? left.required : []),
+      ...(Array.isArray(right.required) ? right.required : []),
+    ]),
+  ];
   if (required.length > 0) merged.required = required;
   for (const key of ['minimum', 'exclusiveMinimum']) {
     const a = left[key];
@@ -88,7 +102,9 @@ function mergeSchema(left: JsonSchema, right: JsonSchema): JsonSchema {
     if (typeof a === 'number' && typeof b === 'number') merged[key] = Math.min(a, b);
   }
   if (Array.isArray(left.enum) && Array.isArray(right.enum)) {
-    merged.enum = left.enum.filter((value) => right.enum?.some((other) => JSON.stringify(other) === JSON.stringify(value)));
+    merged.enum = left.enum.filter((value) =>
+      right.enum?.some((other) => JSON.stringify(other) === JSON.stringify(value)),
+    );
   }
   return merged;
 }
@@ -96,7 +112,9 @@ function mergeSchema(left: JsonSchema, right: JsonSchema): JsonSchema {
 function schemaType(schema: JsonSchema, rng: SeededRandom): string {
   const type = schema.type;
   if (Array.isArray(type)) {
-    const alternatives = type.filter((candidate): candidate is string => typeof candidate === 'string');
+    const alternatives = type.filter(
+      (candidate): candidate is string => typeof candidate === 'string',
+    );
     return rng.pick(alternatives) ?? 'object';
   }
   if (typeof type === 'string') return type;
@@ -106,7 +124,20 @@ function schemaType(schema: JsonSchema, rng: SeededRandom): string {
 }
 
 function isUnconstrained(schema: JsonSchema): boolean {
-  return !['enum', 'const', 'default', 'format', 'pattern', 'minimum', 'maximum', 'exclusiveMinimum', 'exclusiveMaximum', 'multipleOf', 'minLength', 'maxLength'].some((key) => key in schema);
+  return ![
+    'enum',
+    'const',
+    'default',
+    'format',
+    'pattern',
+    'minimum',
+    'maximum',
+    'exclusiveMinimum',
+    'exclusiveMaximum',
+    'multipleOf',
+    'minLength',
+    'maxLength',
+  ].some((key) => key in schema);
 }
 
 function expandCharacterClass(value: string): string[] | undefined {
@@ -117,7 +148,8 @@ function expandCharacterClass(value: string): string[] | undefined {
     if (first === '\\') {
       const escaped = value[index + 1];
       if (escaped === 'd') chars.push(...'0123456789');
-      else if (escaped === 'w') chars.push(...'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_');
+      else if (escaped === 'w')
+        chars.push(...'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_');
       else if (escaped === 's') chars.push(' ');
       else if (escaped) chars.push(escaped);
       index += 2;
@@ -156,7 +188,8 @@ function generateSimplePattern(pattern: string, rng: SeededRandom): string | und
     } else if (char === '\\') {
       const next = source[index + 1];
       if (next === 'd') choices = [...'0123456789'];
-      else if (next === 'w') choices = [...'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_'];
+      else if (next === 'w')
+        choices = [...'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_'];
       else if (next === 's') choices = [' '];
       else if (next) choices = [next];
       else return undefined;
@@ -219,12 +252,38 @@ function formatString(format: string, faker: Faker): string | undefined {
   return undefined;
 }
 
+function fallbackPatternValue(pattern: string, context: Context): string | undefined {
+  try {
+    const expression = new RegExp(pattern);
+    const candidates = [
+      'a',
+      'x',
+      '0',
+      'test',
+      'foo',
+      'abc',
+      'ab',
+      'cd',
+      'abc123',
+      '2020-01-01',
+      context.faker.lorem.word(),
+    ];
+    return candidates.find((candidate) => expression.test(candidate));
+  } catch {
+    return undefined;
+  }
+}
+
 function constrainedString(schema: JsonSchema, context: Context, propertyName: string): string {
   const pattern = stringValue(schema.pattern);
   if (pattern) {
     const matching = generateSimplePattern(pattern, context.rng);
     if (matching !== undefined) return matching;
-    context.warnings.push({ message: `Pattern ${JSON.stringify(pattern)} is too complex for the built-in generator; a fallback value was used.` });
+    context.warnings.push({
+      message: `Pattern ${JSON.stringify(pattern)} is too complex for the built-in generator; a fallback value was used.`,
+    });
+    const fallback = fallbackPatternValue(pattern, context);
+    if (fallback !== undefined) return fallback;
   }
   const format = stringValue(schema.format);
   let candidate = formatString(format, context.faker);
@@ -236,31 +295,54 @@ function constrainedString(schema: JsonSchema, context: Context, propertyName: s
       if (Array.isArray(custom)) candidate = String(context.rng.pick(custom) ?? '');
       else if (custom !== undefined) candidate = String(custom);
     }
-    candidate ??= hintedValue(propertyName, 'string', context.faker, context.rng) as string | undefined;
+    candidate ??= hintedValue(propertyName, 'string', context.faker, context.rng) as
+      string | undefined;
   }
   candidate ??= context.faker.lorem.word();
   const minimum = Math.max(0, Math.floor(numberValue(schema.minLength, 0)));
-  const maximum = Math.max(minimum, Math.floor(numberValue(schema.maxLength, Math.max(80, candidate.length))));
+  const maximum = Math.max(
+    minimum,
+    Math.floor(numberValue(schema.maxLength, Math.max(80, candidate.length))),
+  );
   if (candidate.length < minimum) candidate = candidate.padEnd(minimum, 'x');
   if (candidate.length > maximum) candidate = candidate.slice(0, maximum);
   return candidate;
 }
 
-function generateNumber(schema: JsonSchema, context: Context, type: 'integer' | 'number', propertyName: string): number {
+function generateNumber(
+  schema: JsonSchema,
+  context: Context,
+  type: 'integer' | 'number',
+  propertyName: string,
+): number {
   if (context.hints !== false && isUnconstrained(schema)) {
     const hintOption = context.hints;
     const custom = isRecord(hintOption) ? hintOption[propertyName] : undefined;
-    const hinted = custom !== undefined ? Number(Array.isArray(custom) ? context.rng.pick(custom) : custom) : hintedValue(propertyName, type, context.faker, context.rng);
-    if (typeof hinted === 'number' && Number.isFinite(hinted)) return type === 'integer' ? Math.round(hinted) : hinted;
+    const hinted =
+      custom !== undefined
+        ? Number(Array.isArray(custom) ? context.rng.pick(custom) : custom)
+        : hintedValue(propertyName, type, context.faker, context.rng);
+    if (typeof hinted === 'number' && Number.isFinite(hinted))
+      return type === 'integer' ? Math.round(hinted) : hinted;
   }
   const minimumValue = schema.minimum;
   const maximumValue = schema.maximum;
   let minimum = typeof minimumValue === 'number' ? minimumValue : -100;
   let maximum = typeof maximumValue === 'number' ? maximumValue : 100;
-  if (schema.exclusiveMinimum === true && typeof minimumValue === 'number') minimum += type === 'integer' ? 1 : 0.000001;
-  else if (typeof schema.exclusiveMinimum === 'number') minimum = Math.max(minimum, schema.exclusiveMinimum + (type === 'integer' ? 1 : Number.EPSILON));
-  if (schema.exclusiveMaximum === true && typeof maximumValue === 'number') maximum -= type === 'integer' ? 1 : 0.000001;
-  else if (typeof schema.exclusiveMaximum === 'number') maximum = Math.min(maximum, schema.exclusiveMaximum - (type === 'integer' ? 1 : Number.EPSILON));
+  if (schema.exclusiveMinimum === true && typeof minimumValue === 'number')
+    minimum += type === 'integer' ? 1 : 0.000001;
+  else if (typeof schema.exclusiveMinimum === 'number')
+    minimum = Math.max(
+      minimum,
+      schema.exclusiveMinimum + (type === 'integer' ? 1 : Number.EPSILON),
+    );
+  if (schema.exclusiveMaximum === true && typeof maximumValue === 'number')
+    maximum -= type === 'integer' ? 1 : 0.000001;
+  else if (typeof schema.exclusiveMaximum === 'number')
+    maximum = Math.min(
+      maximum,
+      schema.exclusiveMaximum - (type === 'integer' ? 1 : Number.EPSILON),
+    );
   if (minimum > maximum) minimum = maximum;
   const multipleOf = numberValue(schema.multipleOf, 0);
   if (type === 'integer') {
@@ -269,7 +351,8 @@ function generateNumber(schema: JsonSchema, context: Context, type: 'integer' | 
     if (multipleOf > 0) {
       const first = Math.ceil(low / multipleOf) * multipleOf;
       const last = Math.floor(high / multipleOf) * multipleOf;
-      if (first <= last) return Math.round(context.rng.int(first / multipleOf, last / multipleOf) * multipleOf);
+      if (first <= last)
+        return Math.round(context.rng.int(first / multipleOf, last / multipleOf) * multipleOf);
       return Math.round(first);
     }
     return context.rng.int(low, high);
@@ -280,67 +363,108 @@ function generateNumber(schema: JsonSchema, context: Context, type: 'integer' | 
   return Number(number.toPrecision(8));
 }
 
-function generateArray(schema: JsonSchema, context: Context, depth: number, propertyName: string): unknown[] {
+function generateArray(
+  schema: JsonSchema,
+  context: Context,
+  depth: number,
+  propertyName: string,
+): unknown[] {
   const minimum = Math.max(0, Math.floor(numberValue(schema.minItems, context.minArrayItems)));
-  const maximum = Math.max(minimum, Math.floor(numberValue(schema.maxItems, context.maxArrayItems)));
+  const maximum = Math.max(
+    minimum,
+    Math.floor(numberValue(schema.maxItems, context.maxArrayItems)),
+  );
   const count = context.rng.int(minimum, maximum);
-  const itemSchema = isRecord(schema.items) ? schema.items as JsonSchema : {};
+  const itemSchema = isRecord(schema.items) ? (schema.items as JsonSchema) : {};
   const values: unknown[] = [];
   const unique = schema.uniqueItems === true;
   let attempts = 0;
   while (values.length < count && attempts < Math.max(count * 10, 10)) {
     attempts += 1;
     const value = generateNode(itemSchema, context, depth + 1, `${propertyName}Item`);
-    if (!unique || !values.some((existing) => JSON.stringify(existing) === JSON.stringify(value))) values.push(value);
+    if (!unique || !values.some((existing) => JSON.stringify(existing) === JSON.stringify(value)))
+      values.push(value);
   }
   return values;
 }
 
-function generateObject(schema: JsonSchema, context: Context, depth: number): Record<string, unknown> {
-  const properties = isRecord(schema.properties) ? schema.properties as Record<string, JsonSchema> : {};
-  const required = new Set(Array.isArray(schema.required) ? schema.required.filter((v): v is string => typeof v === 'string') : []);
+function generateObject(
+  schema: JsonSchema,
+  context: Context,
+  depth: number,
+): Record<string, unknown> {
+  const properties = isRecord(schema.properties)
+    ? (schema.properties as Record<string, JsonSchema>)
+    : {};
+  const required = new Set(
+    Array.isArray(schema.required)
+      ? schema.required.filter((v): v is string => typeof v === 'string')
+      : [],
+  );
   const result: Record<string, unknown> = {};
   for (const [name, childSchema] of Object.entries(properties)) {
     if (context.mode === 'response' && childSchema.writeOnly === true) continue;
     if (context.mode === 'request' && childSchema.readOnly === true) continue;
     const isRequired = required.has(name);
+    if (!isRequired && depth >= context.maxDepth) continue;
     if (!isRequired && !context.rng.bool(0.72)) continue;
-    if (!isRequired && depth >= context.maxDepth && childSchema.$ref) continue;
     result[name] = generateNode(childSchema, context, depth + 1, name);
   }
   if (schema.additionalProperties && isRecord(schema.additionalProperties)) {
     // One generated extension property demonstrates the declared additionalProperties schema without making responses noisy.
     const extensionName = properties.extension ? 'extra' : 'extension';
-    result[extensionName] = generateNode(schema.additionalProperties as JsonSchema, context, depth + 1, extensionName);
+    result[extensionName] = generateNode(
+      schema.additionalProperties as JsonSchema,
+      context,
+      depth + 1,
+      extensionName,
+    );
   }
   return result;
 }
 
-function discriminatorValue(branch: JsonSchema): { name: string; value: unknown } | undefined {
-  const discriminator = isRecord(branch.discriminator) ? branch.discriminator : undefined;
-  const propertyName = typeof discriminator?.propertyName === 'string' ? discriminator.propertyName : undefined;
+function discriminatorValue(
+  schema: JsonSchema,
+  branch: JsonSchema,
+  context: Context,
+): { name: string; value: unknown } | undefined {
+  const discriminator = isRecord(schema.discriminator) ? schema.discriminator : undefined;
+  const propertyName =
+    typeof discriminator?.propertyName === 'string' ? discriminator.propertyName : undefined;
   if (!propertyName) return undefined;
-  const properties = isRecord(branch.properties) ? branch.properties : {};
-  const propertySchema = isRecord(properties[propertyName]) ? properties[propertyName] : undefined;
-  if (propertySchema && 'const' in propertySchema) return { name: propertyName, value: propertySchema.const };
-  if (Array.isArray(propertySchema?.enum)) return { name: propertyName, value: propertySchema.enum[0] };
   const mapping = isRecord(discriminator?.mapping) ? discriminator.mapping : undefined;
   if (mapping) {
-    const match = Object.entries(mapping).find(([, ref]) => typeof ref === 'string' && ref === branch.$ref);
+    const match = Object.entries(mapping).find(
+      ([, ref]) => typeof ref === 'string' && ref === branch.$ref,
+    );
     if (match) return { name: propertyName, value: match[0] };
   }
-  if (typeof branch.$ref === 'string') return { name: propertyName, value: branch.$ref.split('/').pop() ?? 'variant' };
+  const resolved = resolveSchema(branch, context);
+  const properties = isRecord(resolved.properties) ? resolved.properties : {};
+  const propertySchema = isRecord(properties[propertyName]) ? properties[propertyName] : undefined;
+  if (propertySchema && 'const' in propertySchema)
+    return { name: propertyName, value: propertySchema.const };
+  if (Array.isArray(propertySchema?.enum))
+    return { name: propertyName, value: propertySchema.enum[0] };
+  if (typeof branch.$ref === 'string')
+    return { name: propertyName, value: branch.$ref.split('/').pop() ?? 'variant' };
   return undefined;
 }
 
 function chooseCompositionBranch(schema: JsonSchema, context: Context): JsonSchema | undefined {
-  const branches = Array.isArray(schema.oneOf) ? schema.oneOf : Array.isArray(schema.anyOf) ? schema.anyOf : undefined;
+  const branches = Array.isArray(schema.oneOf)
+    ? schema.oneOf
+    : Array.isArray(schema.anyOf)
+      ? schema.anyOf
+      : undefined;
   if (!branches || branches.length === 0) return undefined;
   const usable = branches.filter(isRecord) as JsonSchema[];
   if (usable.length === 0) return undefined;
   const discriminator = isRecord(schema.discriminator) ? schema.discriminator : undefined;
   if (typeof discriminator?.propertyName === 'string' && isRecord(discriminator.mapping)) {
-    const mappedRefs = Object.values(discriminator.mapping).filter((value): value is string => typeof value === 'string');
+    const mappedRefs = Object.values(discriminator.mapping).filter(
+      (value): value is string => typeof value === 'string',
+    );
     const selectedRef = context.rng.pick(mappedRefs);
     const found = usable.find((branch) => branch.$ref === selectedRef);
     if (found) return found;
@@ -348,20 +472,34 @@ function chooseCompositionBranch(schema: JsonSchema, context: Context): JsonSche
   return context.rng.pick(usable);
 }
 
-function generateNode(rawSchema: JsonSchema, context: Context, depth: number, propertyName: string): unknown {
+function generateNode(
+  rawSchema: JsonSchema,
+  context: Context,
+  depth: number,
+  propertyName: string,
+): unknown {
   let schema = resolveSchema(rawSchema, context);
   if (rawSchema.$ref && context.refTrail.has(rawSchema.$ref)) {
     if (depth >= context.maxDepth) {
       const resolved = resolveSchema(rawSchema, context);
-      if (resolved.nullable === true || (Array.isArray(resolved.type) && resolved.type.includes('null'))) return null;
+      if (
+        resolved.nullable === true ||
+        (Array.isArray(resolved.type) && resolved.type.includes('null'))
+      )
+        return null;
       if (resolved.default !== undefined) return resolved.default;
       if (resolved.const !== undefined) return resolved.const;
       const type = schemaType(resolved, context.rng);
-      if (type === 'array') return [];
-      if (type === 'object') return {};
-      if (type === 'integer' || type === 'number') return 0;
-      if (type === 'boolean') return false;
-      return '';
+      if (type === 'array')
+        return numberValue(resolved.minItems, 0) === 0
+          ? []
+          : generateArray(resolved, context, context.maxDepth, propertyName);
+      if (type === 'object') return generateObject(resolved, context, context.maxDepth);
+      if (type === 'integer' || type === 'number')
+        return generateNumber(resolved, context, type, propertyName);
+      if (type === 'boolean') return context.rng.bool();
+      if (type === 'string') return constrainedString(resolved, context, propertyName);
+      return null;
     }
   }
   if (rawSchema.$ref) context.refTrail.add(rawSchema.$ref);
@@ -371,7 +509,9 @@ function generateNode(rawSchema: JsonSchema, context: Context, depth: number, pr
     if (Array.isArray(schema.enum) && schema.enum.length > 0) return context.rng.pick(schema.enum);
     if (schema.nullable === true && context.rng.bool(0.12)) return null;
 
-    const allOf = Array.isArray(schema.allOf) ? schema.allOf.filter(isRecord) as JsonSchema[] : [];
+    const allOf = Array.isArray(schema.allOf)
+      ? (schema.allOf.filter(isRecord) as JsonSchema[])
+      : [];
     if (allOf.length > 0) {
       let merged: JsonSchema = { ...schema };
       delete merged.allOf;
@@ -382,14 +522,14 @@ function generateNode(rawSchema: JsonSchema, context: Context, depth: number, pr
     const branch = chooseCompositionBranch(schema, context);
     if (branch) {
       const generated = generateNode(branch, context, depth + 1, propertyName);
-      const disc = discriminatorValue(schema);
+      const disc = discriminatorValue(schema, branch, context);
       const base: JsonSchema = { ...schema };
       delete base.oneOf;
       delete base.anyOf;
       delete base.discriminator;
       const generatedBase = generateNode(base, context, depth, propertyName);
-      if (isRecord(generated) && isRecord(generatedBase)) {
-        const combined = { ...generatedBase, ...generated };
+      if (isRecord(generated)) {
+        const combined = { ...(isRecord(generatedBase) ? generatedBase : {}), ...generated };
         if (disc) combined[disc.name] = disc.value;
         return combined;
       }
@@ -400,7 +540,8 @@ function generateNode(rawSchema: JsonSchema, context: Context, depth: number, pr
     if (type === 'null') return null;
     if (type === 'object') return generateObject(schema, context, depth);
     if (type === 'array') return generateArray(schema, context, depth, propertyName);
-    if (type === 'integer' || type === 'number') return generateNumber(schema, context, type, propertyName);
+    if (type === 'integer' || type === 'number')
+      return generateNumber(schema, context, type, propertyName);
     if (type === 'boolean') return context.rng.bool();
     if (type === 'string') {
       const typeArray = Array.isArray(schema.type) ? schema.type : [];
@@ -428,8 +569,49 @@ function createContext(options: GenerationOptions, seed: number): Context {
   };
 }
 
-export function generateFromSchema(schema: JsonSchema, options: GenerationOptions = {}): GenerationResult {
+function stripModeOnlyFields(
+  value: unknown,
+  field: 'readOnly' | 'writeOnly',
+  seen = new WeakMap<object, unknown>(),
+): unknown {
+  if (Array.isArray(value)) return value.map((item) => stripModeOnlyFields(item, field, seen));
+  if (!isRecord(value)) return value;
+  const known = seen.get(value);
+  if (known) return known;
+  const output: Record<string, unknown> = {};
+  seen.set(value, output);
+  for (const [key, child] of Object.entries(value)) {
+    if (key === 'properties' && isRecord(child)) {
+      const properties: Record<string, unknown> = {};
+      for (const [name, schemaValue] of Object.entries(child)) {
+        if (isRecord(schemaValue) && schemaValue[field] === true) continue;
+        properties[name] = stripModeOnlyFields(schemaValue, field, seen);
+      }
+      output[key] = properties;
+    } else if (key === 'required' && Array.isArray(child)) {
+      const properties = isRecord(value.properties) ? value.properties : {};
+      output[key] = child.filter(
+        (name) =>
+          typeof name !== 'string' ||
+          !isRecord(properties[name]) ||
+          properties[name]?.[field] !== true,
+      );
+    } else {
+      output[key] = stripModeOnlyFields(child, field, seen);
+    }
+  }
+  return output;
+}
+
+export function generateFromSchema(
+  schema: JsonSchema,
+  options: GenerationOptions = {},
+): GenerationResult {
   const baseSeed = options.seed ?? 0;
+  const mode = options.mode ?? 'response';
+  const field = mode === 'response' ? 'writeOnly' : 'readOnly';
+  const validationRoot = stripModeOnlyFields(options.root ?? {}, field) as OpenApiDocument;
+  const validationSchema = stripModeOnlyFields(schema, field) as JsonSchema;
   let last: unknown;
   const warnings: GeneratorWarning[] = [];
   for (let attempt = 0; attempt < 12; attempt += 1) {
@@ -437,13 +619,15 @@ export function generateFromSchema(schema: JsonSchema, options: GenerationOption
     const context = createContext(options, seed);
     last = generateNode(schema, context, 0, '');
     warnings.push(...context.warnings);
-    const validation = validateSchema(context.root, schema, last);
-    if (validation.valid || Object.keys(context.root).length === 0 && !schema.$ref) {
+    const validation = validateSchema(validationRoot, validationSchema, last);
+    if (validation.valid || (Object.keys(validationRoot).length === 0 && !schema.$ref)) {
       return { value: last, warnings: dedupeWarnings(warnings) };
     }
   }
   const reason = warnings.map((warning) => warning.message).join('; ');
-  throw new Error(`Mockline could not generate a value satisfying its schema.${reason ? ` ${reason}` : ''}`);
+  throw new Error(
+    `Mockline could not generate a value satisfying its schema.${reason ? ` ${reason}` : ''}`,
+  );
 }
 
 export function generateValue(schema: JsonSchema, options: GenerationOptions = {}): unknown {

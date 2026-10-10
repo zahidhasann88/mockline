@@ -4,7 +4,11 @@ import type { JsonSchema, OpenApiDocument } from './types.js';
 
 const ROOT_ID = 'https://mockline.local/openapi.json';
 
-function cloneSchema(value: unknown, rootId: string, seen = new WeakMap<object, unknown>()): unknown {
+function cloneSchema(
+  value: unknown,
+  rootId: string,
+  seen = new WeakMap<object, unknown>(),
+): unknown {
   if (Array.isArray(value)) return value.map((item) => cloneSchema(item, rootId, seen));
   if (typeof value !== 'object' || value === null) return value;
   const prior = seen.get(value);
@@ -54,7 +58,11 @@ export function createValidator(root: OpenApiDocument, schema: JsonSchema): Vali
   return ajv.compile(normalized);
 }
 
-export function validateSchema(root: OpenApiDocument, schema: JsonSchema, value: unknown): SchemaValidation {
+export function validateSchema(
+  root: OpenApiDocument,
+  schema: JsonSchema,
+  value: unknown,
+): SchemaValidation {
   try {
     const validator = createValidator(root, schema);
     const valid = validator(value) === true;
@@ -62,13 +70,15 @@ export function validateSchema(root: OpenApiDocument, schema: JsonSchema, value:
   } catch (error) {
     return {
       valid: false,
-      errors: [{
-        keyword: 'schema',
-        instancePath: '',
-        schemaPath: '',
-        params: {},
-        message: error instanceof Error ? error.message : 'Unable to compile schema',
-      }],
+      errors: [
+        {
+          keyword: 'schema',
+          instancePath: '',
+          schemaPath: '',
+          params: {},
+          message: error instanceof Error ? error.message : 'Unable to compile schema',
+        },
+      ],
     };
   }
 }

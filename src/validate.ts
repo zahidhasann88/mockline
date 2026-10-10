@@ -1,6 +1,13 @@
 import type { ErrorObject } from 'ajv';
 import { validateSchema } from './ajv.js';
-import type { ApiParameter, ApiOperation, JsonSchema, MatchedRoute, OpenApiDocument, UnknownRecord } from './types.js';
+import type {
+  ApiParameter,
+  ApiOperation,
+  JsonSchema,
+  MatchedRoute,
+  OpenApiDocument,
+  UnknownRecord,
+} from './types.js';
 
 export interface ValidationIssue {
   location: string;
@@ -55,7 +62,11 @@ function decodeURIComponentSafe(value: string): string {
 }
 
 function schemaType(schema: JsonSchema): string {
-  if (Array.isArray(schema.type)) return schema.type.find((item): item is string => typeof item === 'string' && item !== 'null') ?? 'string';
+  if (Array.isArray(schema.type))
+    return (
+      schema.type.find((item): item is string => typeof item === 'string' && item !== 'null') ??
+      'string'
+    );
   return typeof schema.type === 'string' ? schema.type : 'string';
 }
 
@@ -79,32 +90,74 @@ function coerceScalar(value: string, schema: JsonSchema): unknown {
   return value;
 }
 
-function coerceValue(raw: string | string[] | undefined, schema: JsonSchema, parameter?: ApiParameter): unknown {
+function coerceTyped(value: unknown, schema: JsonSchema): unknown {
+  const type = schemaType(schema);
+  if (type === 'array' && Array.isArray(value)) {
+    const items = isRecord(schema.items) ? (schema.items as JsonSchema) : {};
+    return value.map((item) => coerceTyped(item, items));
+  }
+  if (type === 'object' && isRecord(value)) {
+    const properties = isRecord(schema.properties)
+      ? (schema.properties as Record<string, JsonSchema>)
+      : {};
+    return Object.fromEntries(
+      Object.entries(value).map(([name, item]) => [
+        name,
+        properties[name] ? coerceTyped(item, properties[name]) : item,
+      ]),
+    );
+  }
+  return typeof value === 'string' ? coerceScalar(value, schema) : value;
+}
+
+function coerceValue(
+  raw: string | string[] | undefined,
+  schema: JsonSchema,
+  parameter?: ApiParameter,
+): unknown {
   if (raw === undefined) return undefined;
   const type = schemaType(schema);
   if (type === 'array') {
-    const items = isRecord(schema.items) ? schema.items as JsonSchema : {};
-    if (Array.isArray(raw)) return raw.map((item) => coerceScalar(item, items));
+    const items = isRecord(schema.items) ? (schema.items as JsonSchema) : {};
     const style = parameter?.style ?? (parameter?.in === 'query' ? 'form' : 'simple');
     const explode = parameter?.explode ?? style === 'form';
     const separator = style === 'spaceDelimited' ? ' ' : style === 'pipeDelimited' ? '|' : ',';
-    const values = explode && raw.includes(separator) && style !== 'form' ? raw.split(separator) : raw.includes(separator) && !explode ? raw.split(separator) : [raw];
-    return values.map((item) => coerceScalar(item, items));
+    const values = Array.isArray(raw)
+      ? raw
+      : raw.includes(separator) && !explode
+        ? raw.split(separator)
+        : [raw];
+    return values.map((item) => coerceTyped(item, items));
   }
   if (type === 'object') {
-    if (typeof raw !== 'string') return raw;
-    const value: Record<string, unknown> = {};
-    const separator = parameter?.style === 'simple' ? ',' : '&';
-    for (const pair of raw.split(separator)) {
-      const [name, ...rest] = pair.split('=');
-      if (name) value[name] = rest.join('=');
+    let value: Record<string, unknown>;
+    if (Array.isArray(raw)) return raw;
+    if (raw.trim().startsWith('{')) {
+      try {
+        const parsed = JSON.parse(raw) as unknown;
+        value = isRecord(parsed) ? parsed : {};
+      } catch {
+        value = {};
+      }
+    } else {
+      value = {};
+      const separator = parameter?.style === 'simple' ? ',' : '&';
+      for (const pair of raw.split(separator)) {
+        const [name, ...rest] = pair.split('=');
+        if (name) value[name] = rest.join('=');
+      }
     }
-    return value;
+    return coerceTyped(value, schema);
   }
-  return typeof raw === 'string' ? coerceScalar(raw, schema) : raw.map((item) => coerceScalar(item, schema));
+  return typeof raw === 'string'
+    ? coerceScalar(raw, schema)
+    : raw.map((item) => coerceScalar(item, schema));
 }
 
-function parameterRawValue(parameter: ApiParameter, input: RequestValidationInput): string | string[] | undefined {
+function parameterRawValue(
+  parameter: ApiParameter,
+  input: RequestValidationInput,
+): string | string[] | undefined {
   if (parameter.in === 'path') return input.params[parameter.name];
   if (parameter.in === 'query') {
     const values = input.url.searchParams.getAll(parameter.name);
@@ -115,6 +168,15 @@ function parameterRawValue(parameter: ApiParameter, input: RequestValidationInpu
       for (const [key, value] of input.url.searchParams.entries()) {
         const match = new RegExp(`^${escapeRegExp(parameter.name)}\\[([^\\]]+)\\]$`).exec(key);
         if (match?.[1]) object[match[1]] = value;
+      }
+      if (Object.keys(object).length > 0) return JSON.stringify(object);
+    }
+    if (schemaType(parameter.schema ?? {}) === 'object' && parameter.explode !== false) {
+      const properties = isRecord(parameter.schema?.properties) ? parameter.schema.properties : {};
+      const object: Record<string, string> = {};
+      for (const name of Object.keys(properties)) {
+        const value = input.url.searchParams.get(name);
+        if (value !== null) object[name] = value;
       }
       if (Object.keys(object).length > 0) return JSON.stringify(object);
     }
@@ -156,7 +218,12 @@ function stripReadOnly(value: unknown, seen = new WeakMap<object, unknown>()): u
       copy[key] = properties;
     } else if (key === 'required' && Array.isArray(child)) {
       const parentProperties = isRecord(value.properties) ? value.properties : {};
-      copy[key] = child.filter((property) => typeof property !== 'string' || !isRecord(parentProperties[property]) || parentProperties[property]?.readOnly !== true);
+      copy[key] = child.filter(
+        (property) =>
+          typeof property !== 'string' ||
+          !isRecord(parentProperties[property]) ||
+          parentProperties[property]?.readOnly !== true,
+      );
     } else {
       copy[key] = stripReadOnly(child, seen);
     }
@@ -171,7 +238,11 @@ function requestRootWithoutReadOnly(root: OpenApiDocument): OpenApiDocument {
 function contentTypeMatches(declared: string, actual: string): boolean {
   const expected = declared.split(';')[0]?.trim().toLowerCase() ?? '';
   const received = actual.split(';')[0]?.trim().toLowerCase() ?? '';
-  return expected === received || expected === 'application/*' && received.startsWith('application/') || expected === 'application/json' && received.endsWith('+json');
+  return (
+    expected === received ||
+    (expected === 'application/*' && received.startsWith('application/')) ||
+    (expected === 'application/json' && received.endsWith('+json'))
+  );
 }
 
 function validateParameters(input: RequestValidationInput): ValidationIssue[] {
@@ -181,7 +252,12 @@ function validateParameters(input: RequestValidationInput): ValidationIssue[] {
     const location = `${parameter.in}.${parameter.name}`;
     const raw = parameterRawValue(parameter, input);
     if (raw === undefined) {
-      if (parameter.required) issues.push({ location, message: `${location}: required parameter is missing`, keyword: 'required' });
+      if (parameter.required)
+        issues.push({
+          location,
+          message: `${location}: required parameter is missing`,
+          keyword: 'required',
+        });
       continue;
     }
     const value = coerceValue(raw, parameter.schema, parameter);
@@ -191,38 +267,58 @@ function validateParameters(input: RequestValidationInput): ValidationIssue[] {
   return issues;
 }
 
-function requestBodySchema(operation: ApiOperation): { schema?: JsonSchema; contentTypes: string[]; required: boolean } {
+function requestBodyContent(operation: ApiOperation): {
+  content: Record<string, unknown>;
+  contentTypes: string[];
+  required: boolean;
+} {
   const body = isRecord(operation.requestBody) ? operation.requestBody : undefined;
   const content = isRecord(body?.content) ? body.content : {};
-  const contentTypes = Object.keys(content);
-  const media = contentTypes.find((key) => key === 'application/json' || key.endsWith('+json')) ?? contentTypes[0];
-  const mediaObject = media && isRecord(content[media]) ? content[media] : undefined;
-  return {
-    schema: isRecord(mediaObject?.schema) ? mediaObject.schema as JsonSchema : undefined,
-    contentTypes,
-    required: body?.required === true,
-  };
+  return { content, contentTypes: Object.keys(content), required: body?.required === true };
 }
 
-function validateBody(input: RequestValidationInput): { issues: ValidationIssue[]; bodyInvalid: boolean } {
+function validateBody(input: RequestValidationInput): {
+  issues: ValidationIssue[];
+  bodyInvalid: boolean;
+} {
   const issues: ValidationIssue[] = [];
-  const details = requestBodySchema(input.route.operation);
+  const details = requestBodyContent(input.route.operation);
   if (details.contentTypes.length === 0) return { issues, bodyInvalid: false };
   const contentType = headerValue(input.headers, 'content-type');
   if (input.bodyPresent && !contentType) {
-    issues.push({ location: 'header.content-type', message: 'header.content-type: Content-Type is required for this operation', keyword: 'contentType' });
+    issues.push({
+      location: 'header.content-type',
+      message: 'header.content-type: Content-Type is required for this operation',
+      keyword: 'contentType',
+    });
   }
-  const selectedType = contentType && details.contentTypes.find((declared) => contentTypeMatches(declared, contentType));
+  const selectedType =
+    contentType &&
+    details.contentTypes.find((declared) => contentTypeMatches(declared, contentType));
   if (input.bodyPresent && contentType && !selectedType) {
-    issues.push({ location: 'header.content-type', message: `header.content-type: expected ${details.contentTypes.join(' or ')}`, keyword: 'contentType' });
+    issues.push({
+      location: 'header.content-type',
+      message: `header.content-type: expected ${details.contentTypes.join(' or ')}`,
+      keyword: 'contentType',
+    });
   }
   if (!input.bodyPresent) {
-    if (details.required) issues.push({ location: 'body', message: 'body: required request body is missing', keyword: 'required' });
+    if (details.required)
+      issues.push({
+        location: 'body',
+        message: 'body: required request body is missing',
+        keyword: 'required',
+      });
     return { issues, bodyInvalid: issues.length > 0 };
   }
-  if (!selectedType || !details.schema) return { issues, bodyInvalid: issues.length > 0 };
+  const mediaObject =
+    selectedType && isRecord(details.content[selectedType])
+      ? details.content[selectedType]
+      : undefined;
+  const bodySchema = isRecord(mediaObject?.schema) ? (mediaObject.schema as JsonSchema) : undefined;
+  if (!selectedType || !bodySchema) return { issues, bodyInvalid: issues.length > 0 };
   const root = requestRootWithoutReadOnly(input.root);
-  const validation = validateSchema(root, details.schema, input.body);
+  const validation = validateSchema(root, bodySchema, input.body);
   issues.push(...validation.errors.map((error) => formatAjvIssue(error, '/body')));
   return { issues, bodyInvalid: !validation.valid || issues.length > 0 };
 }
@@ -259,16 +355,25 @@ export function checkSecurityPresence(
       if (type === 'apiKey') {
         const location = String(scheme.in ?? '');
         const credentialName = String(scheme.name ?? '');
-        const present = location === 'header'
-          ? Boolean(headerValue(headers, credentialName))
-          : location === 'query'
-            ? url.searchParams.has(credentialName)
-            : location === 'cookie'
-              ? cookieValues(headerValue(headers, 'cookie')).has(credentialName)
-              : false;
+        const headerCredential =
+          location === 'header' ? headerValue(headers, credentialName) : undefined;
+        const present =
+          location === 'header'
+            ? headerCredential !== undefined
+            : location === 'query'
+              ? url.searchParams.has(credentialName)
+              : location === 'cookie'
+                ? cookieValues(headerValue(headers, 'cookie')).has(credentialName)
+                : false;
         if (!present) missing.push(`${name} (${location} ${credentialName})`);
-      } else if (type === 'http' || type === 'oauth2' || type === 'openIdConnect' || type === 'mutualTLS') {
-        if (!headerValue(headers, 'authorization')) missing.push(`${name} (Authorization)`);
+      } else if (
+        type === 'http' ||
+        type === 'oauth2' ||
+        type === 'openIdConnect' ||
+        type === 'mutualTLS'
+      ) {
+        if (headerValue(headers, 'authorization') === undefined)
+          missing.push(`${name} (Authorization)`);
       } else {
         missing.push(name);
       }

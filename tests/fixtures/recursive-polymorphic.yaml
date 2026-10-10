@@ -1,0 +1,56 @@
+openapi: 3.0.3
+info:
+  title: Recursive and polymorphic fixture
+  version: 1.0.0
+paths:
+  /tree:
+    get:
+      operationId: getTree
+      responses:
+        '200':
+          description: Recursive tree
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Node' }
+  /animals:
+    get:
+      operationId: getAnimal
+      responses:
+        '200':
+          description: One animal
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: '#/components/schemas/Cat'
+                  - $ref: '#/components/schemas/Dog'
+                discriminator:
+                  propertyName: kind
+                  mapping:
+                    cat: '#/components/schemas/Cat'
+                    dog: '#/components/schemas/Dog'
+components:
+  schemas:
+    Node:
+      type: object
+      required: [name]
+      properties:
+        name: { type: string, minLength: 1 }
+        next: { $ref: '#/components/schemas/Node' }
+        children:
+          type: array
+          items: { $ref: '#/components/schemas/Node' }
+    Cat:
+      type: object
+      required: [kind, lives]
+      properties:
+        kind: { type: string, enum: [cat] }
+        lives: { type: integer, minimum: 1, maximum: 9 }
+        name: { type: string }
+    Dog:
+      type: object
+      required: [kind, barkVolume]
+      properties:
+        kind: { type: string, enum: [dog] }
+        barkVolume: { type: number, minimum: 0, maximum: 10 }
+        name: { type: string }

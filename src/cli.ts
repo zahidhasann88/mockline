@@ -1,18 +1,23 @@
 #!/usr/bin/env node
 import { existsSync } from 'node:fs';
+import { createRequire } from 'node:module';
 import { writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import cac from 'cac';
 import pc from 'picocolors';
+import { ZodError } from 'zod';
 import { configSchema, type MocklineConfig } from './config/schema.js';
-import { loadConfig } from './config/load.js';
+import { formatConfigErrors, loadConfig } from './config/load.js';
 import { MocklineError } from './errors.js';
 import { createLogger } from './logger.js';
 import { loadSpec } from './spec/load.js';
 import { summarizeSpec } from './spec/summary.js';
 import { createMockServer } from './server.js';
 
-const VERSION = '0.1.0';
+const packageMetadata = createRequire(import.meta.url)('../package.json') as {
+  version: string;
+};
+const VERSION = packageMetadata.version;
 const SAMPLE_SPEC = `openapi: 3.0.3
 info:
   title: Mockline starter Petstore
@@ -191,19 +196,27 @@ function parseDelay(value: string | undefined): MocklineConfig['latency'] | unde
   if (range) {
     const min = Number(range[1]);
     const max = Number(range[2]);
-    if (max < min) throw new MocklineError('--delay range must be min-max with min no greater than max.', 2);
+    if (max < min)
+      throw new MocklineError('--delay range must be min-max with min no greater than max.', 2);
     return [min, max];
   }
   const fixed = Number(value);
-  if (!Number.isFinite(fixed) || fixed < 0) throw new MocklineError('--delay must be a non-negative number or min-max range.', 2);
+  if (!Number.isFinite(fixed) || fixed < 0)
+    throw new MocklineError('--delay must be a non-negative number or min-max range.', 2);
   return fixed;
 }
 
 function parseStatuses(value: string | undefined): number[] | undefined {
   if (value === undefined) return undefined;
   const statuses = value.split(',').map((item) => Number(item.trim()));
-  if (statuses.length === 0 || statuses.some((status) => !Number.isInteger(status) || status < 400 || status > 599)) {
-    throw new MocklineError('--error-statuses must be a comma-separated list of HTTP error status codes.', 2);
+  if (
+    statuses.length === 0 ||
+    statuses.some((status) => !Number.isInteger(status) || status < 400 || status > 599)
+  ) {
+    throw new MocklineError(
+      '--error-statuses must be a comma-separated list of HTTP error status codes.',
+      2,
+    );
   }
   return statuses;
 }
@@ -216,38 +229,62 @@ function makeConfig(base: MocklineConfig, options: CliOptions): MocklineConfig {
     throw new MocklineError('--error-rate must be a number from 0 to 1.', 2);
   }
   const prefer = optionString(options, 'prefer');
-  if (prefer && prefer !== 'example' && prefer !== 'generate') throw new MocklineError('--prefer must be example or generate.', 2);
+  if (prefer && prefer !== 'example' && prefer !== 'generate')
+    throw new MocklineError('--prefer must be example or generate.', 2);
   const validate = optionString(options, 'validate');
-  if (validate && !['off', 'warn', 'strict'].includes(validate)) throw new MocklineError('--validate must be off, warn, or strict.', 2);
+  if (validate && !['off', 'warn', 'strict'].includes(validate))
+    throw new MocklineError('--validate must be off, warn, or strict.', 2);
   const statuses = parseStatuses(options.errorStatuses);
   const delay = parseDelay(options.delay);
-  return configSchema.parse({
-    ...base,
-    ...(port !== undefined ? { port } : {}),
-    ...(options.host !== undefined ? { host: options.host } : {}),
-    ...(seed !== undefined ? { seed } : {}),
-    ...(prefer ? { prefer } : {}),
-    ...(delay !== undefined ? { latency: delay } : {}),
-    ...(validate ? { validate } : {}),
-    errors: {
-      ...base.errors,
-      ...(errorRate !== undefined ? { rate: errorRate } : {}),
-      ...(statuses ? { statuses } : {}),
-    },
-    stateful: { ...base.stateful, ...(options.stateful ? { enabled: true } : {}) },
-    proxy: {
-      ...base.proxy,
-      ...(options.proxy ? { url: options.proxy } : {}),
-      ...(options.proxyAll ? { all: true } : {}),
-      ...(options.proxyAllowPrivate ? { allowPrivate: true } : {}),
-      ...(options.proxyRecord ? { recordFile: options.proxyRecord } : {}),
-    },
-    cors: { ...base.cors, ...(options.cors !== undefined ? { enabled: options.cors } : {}) },
-    recording: { ...base.recording, ...(options.recordFile ? { file: options.recordFile } : {}) },
-    inspector: { ...base.inspector, ...(options.inspector ? { enabled: true } : {}) },
-    enforceAuth: Boolean(options.enforceAuth) || base.enforceAuth,
-    generation: { ...base.generation, ...(options.seedCounter ? { counter: true } : {}) },
-  });
+  try {
+    return configSchema.parse({
+      ...base,
+      ...(port !== undefined ? { port } : {}),
+      ...(options.host !== undefined ? { host: options.host } : {}),
+      ...(seed !== undefined ? { seed } : {}),
+      ...(prefer ? { prefer } : {}),
+      ...(delay !== undefined ? { latency: delay } : {}),
+      ...(validate ? { validate } : {}),
+      errors: {
+        ...base.errors,
+        ...(errorRate !== undefined ? { rate: errorRate } : {}),
+        ...(statuses ? { statuses } : {}),
+      },
+      stateful: {
+        ...base.stateful,
+        ...(options.stateful ? { enabled: true } : {}),
+      },
+      proxy: {
+        ...base.proxy,
+        ...(options.proxy ? { url: options.proxy } : {}),
+        ...(options.proxyAll ? { all: true } : {}),
+        ...(options.proxyAllowPrivate ? { allowPrivate: true } : {}),
+        ...(options.proxyRecord ? { recordFile: options.proxyRecord } : {}),
+      },
+      cors: {
+        ...base.cors,
+        ...(options.cors !== undefined ? { enabled: options.cors } : {}),
+      },
+      recording: {
+        ...base.recording,
+        ...(options.recordFile ? { file: options.recordFile } : {}),
+      },
+      inspector: {
+        ...base.inspector,
+        ...(options.inspector ? { enabled: true } : {}),
+      },
+      enforceAuth: Boolean(options.enforceAuth) || base.enforceAuth,
+      generation: {
+        ...base.generation,
+        ...(options.seedCounter ? { counter: true } : {}),
+      },
+    });
+  } catch (error) {
+    if (error instanceof ZodError) {
+      throw new MocklineError(`Invalid CLI configuration:\n${formatConfigErrors(error)}`, 2);
+    }
+    throw error;
+  }
 }
 
 function table(spec: Awaited<ReturnType<typeof loadSpec>>, configKeys: string[] = []): string {
@@ -261,15 +298,28 @@ function table(spec: Awaited<ReturnType<typeof loadSpec>>, configKeys: string[] 
     Math.max(6, ...rows.map((row) => row.source.length)),
   ];
   const headers = ['METHOD', 'PATH', 'OPERATION ID', 'STATUS', 'SOURCE'];
-  const line = (values: string[]): string => values.map((value, index) => value.padEnd(widths[index] ?? value.length)).join('  ');
-  return [line(headers), line(widths.map((width) => '-'.repeat(width))), ...rows.map((row) => line([row.method, row.path, row.operationId, row.defaultStatus, row.source]))].join('\n');
+  const line = (values: string[]): string =>
+    values.map((value, index) => value.padEnd(widths[index] ?? value.length)).join('  ');
+  return [
+    line(headers),
+    line(widths.map((width) => '-'.repeat(width))),
+    ...rows.map((row) =>
+      line([row.method, row.path, row.operationId, row.defaultStatus, row.source]),
+    ),
+  ].join('\n');
 }
 
-async function initProject(options: CliOptions, logger: ReturnType<typeof createLogger>): Promise<void> {
+async function initProject(
+  options: CliOptions,
+  logger: ReturnType<typeof createLogger>,
+): Promise<void> {
   const configFile = resolve('mockline.yaml');
   const specFile = resolve('openapi.yaml');
   if (!options.force && (existsSync(configFile) || existsSync(specFile))) {
-    throw new MocklineError('mockline.yaml or openapi.yaml already exists. Use --force to overwrite them.', 1);
+    throw new MocklineError(
+      'mockline.yaml or openapi.yaml already exists. Use --force to overwrite them.',
+      1,
+    );
   }
   await writeFile(configFile, SAMPLE_CONFIG, 'utf8');
   await writeFile(specFile, SAMPLE_SPEC, 'utf8');
@@ -279,7 +329,11 @@ async function initProject(options: CliOptions, logger: ReturnType<typeof create
 async function startServing(specPath: string, options: CliOptions): Promise<void> {
   const loadedConfig = await loadConfig(options.config);
   const config = makeConfig(loadedConfig.config, options);
-  const logger = createLogger({ quiet: options.quiet, verbose: options.verbose, color: options.color });
+  const logger = createLogger({
+    quiet: options.quiet,
+    verbose: options.verbose,
+    color: options.color,
+  });
   const server = await createMockServer({
     spec: specPath,
     config,
@@ -298,12 +352,15 @@ async function startServing(specPath: string, options: CliOptions): Promise<void
   const stop = (): void => {
     if (stopping) return;
     stopping = true;
-    void server.close().then(() => {
-      process.exitCode = 0;
-    }).catch((error: unknown) => {
-      logger.error(error instanceof Error ? error.message : String(error));
-      process.exitCode = 3;
-    });
+    void server
+      .close()
+      .then(() => {
+        process.exitCode = 0;
+      })
+      .catch((error: unknown) => {
+        logger.error(error instanceof Error ? error.message : String(error));
+        process.exitCode = 3;
+      });
   };
   process.once('SIGINT', stop);
   process.once('SIGTERM', stop);
@@ -316,23 +373,29 @@ export async function runCli(argv = process.argv.slice(2)): Promise<number> {
   let action = Promise.resolve();
   let failureCode = 0;
   const logger = createLogger();
-  const register = (handler: (...args: unknown[]) => Promise<void>): ((...args: unknown[]) => void) => (...args) => {
-    action = handler(...args).catch((error: unknown) => {
-      const code = error instanceof MocklineError ? error.exitCode : 3;
-      failureCode = code;
-      const message = error instanceof Error ? error.message : String(error);
-      console.error(pc.red('error'), message);
-    });
-  };
+  const register =
+    (handler: (...args: unknown[]) => Promise<void>): ((...args: unknown[]) => void) =>
+    (...args) => {
+      action = handler(...args).catch((error: unknown) => {
+        const code = error instanceof MocklineError ? error.exitCode : 3;
+        failureCode = code;
+        const message = error instanceof Error ? error.message : String(error);
+        console.error(pc.red('error'), message);
+      });
+    };
 
-  cli.command('init', 'Create a commented config and a starter OpenAPI spec')
+  cli
+    .command('init', 'Create a commented config and a starter OpenAPI spec')
     .option('--force', 'Overwrite existing starter files')
-    .action(register(async (...args) => {
-      const options = (args[0] ?? {}) as CliOptions;
-      await initProject(options, logger);
-    }));
+    .action(
+      register(async (...args) => {
+        const options = (args[0] ?? {}) as CliOptions;
+        await initProject(options, logger);
+      }),
+    );
 
-  cli.command('serve <spec>', 'Start a mock API server')
+  cli
+    .command('serve <spec>', 'Start a mock API server')
     .option('--port <port>', 'Port to listen on; use 0 to select a free port')
     .option('--host <host>', 'Bind address (default 127.0.0.1)')
     .option('--config <file>', 'YAML or JSON config file')
@@ -357,29 +420,40 @@ export async function runCli(argv = process.argv.slice(2)): Promise<number> {
     .option('--quiet', 'Suppress normal logs')
     .option('--verbose', 'Enable diagnostic logs')
     .option('--no-color', 'Disable color output')
-    .action(register(async (spec: unknown, optionsUnknown: unknown) => {
-      const specPath = String(spec);
-      const options = (optionsUnknown ?? {}) as CliOptions;
-      await startServing(specPath, options);
-    }));
+    .action(
+      register(async (spec: unknown, optionsUnknown: unknown) => {
+        const specPath = String(spec);
+        const options = (optionsUnknown ?? {}) as CliOptions;
+        await startServing(specPath, options);
+      }),
+    );
 
-  cli.command('routes <spec>', 'List operations and their default response source')
-    .action(register(async (spec: unknown) => {
+  cli.command('routes <spec>', 'List operations and their default response source').action(
+    register(async (spec: unknown) => {
       const loaded = await loadSpec(String(spec));
-      console.log(table(loaded));
-    }));
+      const config = await loadConfig();
+      console.log(table(loaded, Object.keys(config.config.overrides)));
+    }),
+  );
 
-  cli.command('validate <spec>', 'Validate an OpenAPI document and report mocking limitations')
-    .action(register(async (spec: unknown) => {
-      const loaded = await loadSpec(String(spec));
-      const operationCount = summarizeSpec(loaded).length;
-      const version = loaded.document.openapi ?? 'OpenAPI';
-      console.log(`${pc.green('Valid')} ${version}: ${operationCount} operation(s), ${loaded.warnings.length} warning(s).`);
-      for (const warning of loaded.warnings) {
-        const location = warning.operationId ? ` (${warning.operationId}${warning.path ? ` ${warning.path}` : ''})` : '';
-        console.warn(`${pc.yellow('warning')}${location}: ${warning.message}`);
-      }
-    }));
+  cli
+    .command('validate <spec>', 'Validate an OpenAPI document and report mocking limitations')
+    .action(
+      register(async (spec: unknown) => {
+        const loaded = await loadSpec(String(spec));
+        const operationCount = summarizeSpec(loaded).length;
+        const version = loaded.document.openapi ?? 'OpenAPI';
+        console.log(
+          `${pc.green('Valid')} ${version}: ${operationCount} operation(s), ${loaded.warnings.length} warning(s).`,
+        );
+        for (const warning of loaded.warnings) {
+          const location = warning.operationId
+            ? ` (${warning.operationId}${warning.path ? ` ${warning.path}` : ''})`
+            : '';
+          console.warn(`${pc.yellow('warning')}${location}: ${warning.message}`);
+        }
+      }),
+    );
 
   cli.on('command:*', () => {
     console.error(`Unknown command: ${argv[0] ?? ''}`);
@@ -388,6 +462,10 @@ export async function runCli(argv = process.argv.slice(2)): Promise<number> {
   });
 
   try {
+    if (argv.length === 0) {
+      cli.outputHelp();
+      return 0;
+    }
     cli.parse(['node', 'mockline', ...argv], { run: true });
     await action;
     return failureCode;

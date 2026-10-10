@@ -6,8 +6,17 @@ import { problem } from './errors.js';
 import type { MocklineConfig } from './config/schema.js';
 
 const HOP_BY_HOP = new Set([
-  'connection', 'keep-alive', 'proxy-authenticate', 'proxy-authorization', 'te', 'trailer',
-  'transfer-encoding', 'upgrade', 'host', 'content-length', 'expect',
+  'connection',
+  'keep-alive',
+  'proxy-authenticate',
+  'proxy-authorization',
+  'te',
+  'trailer',
+  'transfer-encoding',
+  'upgrade',
+  'host',
+  'content-length',
+  'expect',
 ]);
 
 export interface ProxyRequest {
@@ -49,9 +58,23 @@ interface SavedProxyExample {
 
 function isPrivateIpv4(address: string): boolean {
   const parts = address.split('.').map(Number);
-  if (parts.length !== 4 || parts.some((part) => !Number.isInteger(part) || part < 0 || part > 255)) return true;
+  if (parts.length !== 4 || parts.some((part) => !Number.isInteger(part) || part < 0 || part > 255))
+    return true;
   const [a = 0, b = 0] = parts;
-  return a === 0 || a === 10 || a === 127 || a >= 224 || a === 169 && b === 254 || a === 172 && b >= 16 && b <= 31 || a === 192 && b === 168 || a === 100 && b >= 64 && b <= 127 || a === 198 && (b === 18 || b === 19) || a === 192 && b === 0 || a === 192 && b === 0 || a === 198 && b === 51 || a === 203 && b === 0;
+  return (
+    a === 0 ||
+    a === 10 ||
+    a === 127 ||
+    a >= 224 ||
+    (a === 169 && b === 254) ||
+    (a === 172 && b >= 16 && b <= 31) ||
+    (a === 192 && b === 168) ||
+    (a === 100 && b >= 64 && b <= 127) ||
+    (a === 198 && (b === 18 || b === 19)) ||
+    (a === 192 && b === 0) ||
+    (a === 198 && b === 51) ||
+    (a === 203 && b === 0)
+  );
 }
 
 function ipv4FromMappedIpv6(address: string): string | undefined {
@@ -73,17 +96,21 @@ export function isPrivateAddress(address: string): boolean {
   const normalized = address.toLowerCase().split('%')[0] ?? '';
   const mapped = ipv4FromMappedIpv6(normalized);
   if (mapped) return isPrivateIpv4(mapped);
-  return normalized === '::' || normalized === '::1'
-    || /^f[cd]/.test(normalized)
-    || /^fe[89ab]/.test(normalized)
-    || normalized.startsWith('ff')
-    || normalized.startsWith('2001:db8:');
+  return (
+    normalized === '::' ||
+    normalized === '::1' ||
+    /^f[cd]/.test(normalized) ||
+    /^fe[89ab]/.test(normalized) ||
+    normalized.startsWith('ff') ||
+    normalized.startsWith('2001:db8:')
+  );
 }
 
 function stripHopByHop(headers: Record<string, string>): Record<string, string> {
   const blocked = new Set(HOP_BY_HOP);
   const connection = headers.connection;
-  if (connection) for (const header of connection.split(',')) blocked.add(header.trim().toLowerCase());
+  if (connection)
+    for (const header of connection.split(',')) blocked.add(header.trim().toLowerCase());
   const output: Record<string, string> = {};
   for (const [name, value] of Object.entries(headers)) {
     if (!blocked.has(name.toLowerCase())) output[name] = value;
@@ -94,14 +121,17 @@ function stripHopByHop(headers: Record<string, string>): Record<string, string> 
 function requestHeaders(headers: ProxyRequest['headers']): Record<string, string> {
   const output: Record<string, string> = {};
   for (const [name, value] of Object.entries(headers)) {
-    if (value !== undefined) output[name.toLowerCase()] = Array.isArray(value) ? value.join(', ') : value;
+    if (value !== undefined)
+      output[name.toLowerCase()] = Array.isArray(value) ? value.join(', ') : value;
   }
   return stripHopByHop(output);
 }
 
 function targetUrl(upstream: URL, requestUrl: URL): URL {
   const basePath = upstream.pathname.replace(/\/+$/, '');
-  const requestedPath = requestUrl.pathname.startsWith('/') ? requestUrl.pathname : `/${requestUrl.pathname}`;
+  const requestedPath = requestUrl.pathname.startsWith('/')
+    ? requestUrl.pathname
+    : `/${requestUrl.pathname}`;
   const target = new URL(upstream);
   target.pathname = `${basePath}${requestedPath}` || '/';
   target.search = requestUrl.search;
@@ -110,12 +140,20 @@ function targetUrl(upstream: URL, requestUrl: URL): URL {
 }
 
 async function resolvesPrivate(hostname: string, timeoutMs: number): Promise<boolean> {
-  if (isIP(hostname)) return isPrivateAddress(hostname);
-  if (hostname === 'localhost' || hostname.endsWith('.localhost')) return true;
+  const unbracketedHost = hostname.replace(/^\[(.*)\]$/, '$1');
+  if (isIP(unbracketedHost)) return isPrivateAddress(unbracketedHost);
+  const normalizedHost = unbracketedHost.toLowerCase().replace(/\.$/, '');
+  if (
+    normalizedHost === 'localhost' ||
+    ['.localhost', '.local', '.internal', '.lan', '.home.arpa'].some((suffix) =>
+      normalizedHost.endsWith(suffix),
+    )
+  )
+    return true;
   let timer: NodeJS.Timeout | undefined;
   try {
     const addresses = await Promise.race([
-      lookup(hostname, { all: true, verbatim: true }),
+      lookup(unbracketedHost, { all: true, verbatim: true }),
       new Promise<never>((_resolve, reject) => {
         timer = setTimeout(() => reject(new Error('DNS lookup timed out')), timeoutMs);
       }),
@@ -128,7 +166,15 @@ async function resolvesPrivate(hostname: string, timeoutMs: number): Promise<boo
 
 function proxyProblem(status: number, title: string, detail: string): ProxyResult {
   const body = Buffer.from(JSON.stringify(problem(status, title, detail)));
-  return { status, headers: { 'content-type': 'application/problem+json; charset=utf-8', 'content-length': String(body.byteLength) }, body, blocked: status === 403 };
+  return {
+    status,
+    headers: {
+      'content-type': 'application/problem+json; charset=utf-8',
+      'content-length': String(body.byteLength),
+    },
+    body,
+    blocked: status === 403,
+  };
 }
 
 export async function forwardRequest(input: ProxyRequest): Promise<ProxyResult> {
@@ -144,19 +190,28 @@ export async function forwardRequest(input: ProxyRequest): Promise<ProxyResult> 
   if (!input.config.allowPrivate) {
     try {
       if (await resolvesPrivate(upstream.hostname, input.config.timeoutMs)) {
-        return proxyProblem(403, 'Forbidden', 'Proxying to private, loopback, or link-local addresses is disabled. Use --proxy-allow-private only for a trusted local upstream.');
+        return proxyProblem(
+          403,
+          'Forbidden',
+          'Proxying to private, loopback, or link-local addresses is disabled. Use --proxy-allow-private only for a trusted local upstream.',
+        );
       }
     } catch (error) {
-      return proxyProblem(502, 'Bad Gateway', `Could not safely resolve proxy host: ${error instanceof Error ? error.message : String(error)}`);
+      return proxyProblem(
+        502,
+        'Bad Gateway',
+        `Could not safely resolve proxy host: ${error instanceof Error ? error.message : String(error)}`,
+      );
     }
   }
   const target = targetUrl(upstream, input.requestUrl);
   const fetchImpl = input.fetchImpl ?? globalThis.fetch;
   const headers = requestHeaders(input.headers);
   try {
-    const copiedBody = input.body && input.body.byteLength > 0 && input.method !== 'GET' && input.method !== 'HEAD'
-      ? Uint8Array.from(input.body)
-      : undefined;
+    const copiedBody =
+      input.body && input.body.byteLength > 0 && input.method !== 'GET' && input.method !== 'HEAD'
+        ? Uint8Array.from(input.body)
+        : undefined;
     const response = await fetchImpl(target, {
       method: input.method,
       headers,
@@ -174,8 +229,15 @@ export async function forwardRequest(input: ProxyRequest): Promise<ProxyResult> 
     delete filtered['content-encoding'];
     return { status: response.status, headers: filtered, body, blocked: false };
   } catch (error) {
-    const timedOut = error instanceof Error && (error.name === 'TimeoutError' || error.name === 'AbortError');
-    return proxyProblem(timedOut ? 504 : 502, timedOut ? 'Gateway Timeout' : 'Bad Gateway', timedOut ? 'The upstream request timed out.' : `The upstream request failed: ${error instanceof Error ? error.message : String(error)}`);
+    const timedOut =
+      error instanceof Error && (error.name === 'TimeoutError' || error.name === 'AbortError');
+    return proxyProblem(
+      timedOut ? 504 : 502,
+      timedOut ? 'Gateway Timeout' : 'Bad Gateway',
+      timedOut
+        ? 'The upstream request timed out.'
+        : `The upstream request failed: ${error instanceof Error ? error.message : String(error)}`,
+    );
   }
 }
 
@@ -215,25 +277,38 @@ export class ProxyExampleRecorder {
   record(input: ProxyExampleInput): void {
     if (!this.file) return;
     const example = decodeExample(input);
-    this.queue = this.queue.then(async () => {
-      await mkdir(dirname(this.file as string), { recursive: true });
-      let examples: SavedProxyExample[] = [];
-      try {
-        const existing = JSON.parse(await readFile(this.file as string, 'utf8')) as unknown;
-        if (typeof existing === 'object' && existing !== null && !Array.isArray(existing) && Array.isArray((existing as { examples?: unknown }).examples)) {
-          examples = (existing as { examples: SavedProxyExample[] }).examples;
+    this.queue = this.queue
+      .then(async () => {
+        await mkdir(dirname(this.file as string), { recursive: true });
+        let examples: SavedProxyExample[] = [];
+        try {
+          const existing = JSON.parse(await readFile(this.file as string, 'utf8')) as unknown;
+          if (
+            typeof existing === 'object' &&
+            existing !== null &&
+            !Array.isArray(existing) &&
+            Array.isArray((existing as { examples?: unknown }).examples)
+          ) {
+            examples = (existing as { examples: SavedProxyExample[] }).examples;
+          }
+        } catch {
+          // A missing file starts a new examples document; malformed files are replaced on the next successful record.
         }
-      } catch {
-        // A missing file starts a new examples document; malformed files are replaced on the next successful record.
-      }
-      examples.push(example);
-      const destination = this.file as string;
-      const temporary = `${destination}.tmp`;
-      await writeFile(temporary, `${JSON.stringify({ format: 'mockline-proxy-examples-v1', examples }, null, 2)}\n`, 'utf8');
-      await rename(temporary, destination);
-    }).catch((error: unknown) => {
-      console.error(`mockline: could not save proxy example: ${error instanceof Error ? error.message : String(error)}`);
-    });
+        examples.push(example);
+        const destination = this.file as string;
+        const temporary = `${destination}.tmp`;
+        await writeFile(
+          temporary,
+          `${JSON.stringify({ format: 'mockline-proxy-examples-v1', examples }, null, 2)}\n`,
+          'utf8',
+        );
+        await rename(temporary, destination);
+      })
+      .catch((error: unknown) => {
+        console.error(
+          `mockline: could not save proxy example: ${error instanceof Error ? error.message : String(error)}`,
+        );
+      });
   }
 
   async flush(): Promise<void> {

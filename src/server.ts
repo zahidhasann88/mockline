@@ -14,8 +14,20 @@ import { RequestRecorder } from './record.js';
 import { handleInspector } from './inspector.js';
 import { ResourceStore } from './state/store.js';
 import { forwardRequest, ProxyExampleRecorder } from './proxy.js';
-import { checkSecurityPresence, strictValidationStatus, validateRequest, type ValidationIssue } from './validate.js';
-import type { JsonValue, MatchedRoute, MockResponse, RecordedRequest, RequestFilter, ResponseSource } from './types.js';
+import {
+  checkSecurityPresence,
+  strictValidationStatus,
+  validateRequest,
+  type ValidationIssue,
+} from './validate.js';
+import type {
+  JsonValue,
+  MatchedRoute,
+  MockResponse,
+  RecordedRequest,
+  RequestFilter,
+  ResponseSource,
+} from './types.js';
 
 export interface RequestAccessor {
   (filter?: RequestFilter): RecordedRequest[];
@@ -31,12 +43,18 @@ export interface MockServer {
   close(): Promise<void>;
 }
 
+export type DeepPartial<T> = T extends readonly unknown[]
+  ? T
+  : T extends object
+    ? { [K in keyof T]?: DeepPartial<T[K]> }
+    : T;
+
 export interface CreateMockServerOptions {
   spec: string;
   port?: number;
   host?: string;
   seed?: number;
-  config?: Partial<MocklineConfig>;
+  config?: DeepPartial<MocklineConfig>;
   inspector?: boolean;
   logger?: Logger;
   clock?: () => Date;
@@ -71,13 +89,21 @@ class InvalidJsonError extends Error {
   }
 }
 
-function asHeaders(headers: IncomingMessage['headers']): Record<string, string | string[] | undefined> {
+function asHeaders(
+  headers: IncomingMessage['headers'],
+): Record<string, string | string[] | undefined> {
   return headers;
 }
 
 function isLoopback(host: string): boolean {
   const value = host.toLowerCase().replace(/^\[|\]$/g, '');
-  return value === 'localhost' || value === '::1' || value.startsWith('127.') || value.startsWith('::ffff:127.') || isIP(value) === 0 && value.endsWith('.localhost');
+  return (
+    value === 'localhost' ||
+    value === '::1' ||
+    value.startsWith('127.') ||
+    value.startsWith('::ffff:127.') ||
+    (isIP(value) === 0 && value.endsWith('.localhost'))
+  );
 }
 
 function hostnameForUrl(host: string): string {
@@ -96,11 +122,21 @@ function applyCors(req: IncomingMessage, res: ServerResponse, config: MocklineCo
   }
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, PATCH, DELETE, OPTIONS, HEAD');
   const requestHeaders = req.headers['access-control-request-headers'];
-  res.setHeader('Access-Control-Allow-Headers', requestHeaders ?? 'Content-Type, Authorization, Prefer, X-Mockline-Status, X-Mockline-Delay, X-Mockline-Error');
+  res.setHeader(
+    'Access-Control-Allow-Headers',
+    requestHeaders ??
+      'Content-Type, Authorization, Prefer, X-Mockline-Status, X-Mockline-Delay, X-Mockline-Error',
+  );
   res.setHeader('Access-Control-Max-Age', '600');
 }
 
-function writeJson(res: ServerResponse, status: number, body: unknown, headers: Record<string, string> = {}, head = false): void {
+function writeJson(
+  res: ServerResponse,
+  status: number,
+  body: unknown,
+  headers: Record<string, string> = {},
+  head = false,
+): void {
   if (res.destroyed || res.writableEnded) return;
   const safeStatus = Number.isInteger(status) && status >= 100 && status <= 599 ? status : 500;
   res.statusCode = safeStatus;
@@ -111,7 +147,8 @@ function writeJson(res: ServerResponse, status: number, body: unknown, headers: 
       // Ignore an invalid override header rather than crashing the server.
     }
   }
-  if (!res.hasHeader('content-type')) res.setHeader('content-type', 'application/json; charset=utf-8');
+  if (!res.hasHeader('content-type'))
+    res.setHeader('content-type', 'application/json; charset=utf-8');
   if (head || safeStatus === 204 || safeStatus === 304) {
     res.end();
     return;
@@ -126,11 +163,20 @@ function writeJson(res: ServerResponse, status: number, body: unknown, headers: 
       serialized = JSON.stringify(body);
     } catch {
       res.statusCode = 500;
-      serialized = JSON.stringify(problem(500, 'Internal Server Error', 'The selected response body could not be serialized.'));
+      serialized = JSON.stringify(
+        problem(
+          500,
+          'Internal Server Error',
+          'The selected response body could not be serialized.',
+        ),
+      );
       res.setHeader('content-type', 'application/problem+json; charset=utf-8');
     }
   }
-  res.setHeader('content-length', Buffer.isBuffer(serialized) ? serialized.byteLength : Buffer.byteLength(serialized));
+  res.setHeader(
+    'content-length',
+    Buffer.isBuffer(serialized) ? serialized.byteLength : Buffer.byteLength(serialized),
+  );
   try {
     res.end(serialized);
   } catch {
@@ -143,7 +189,8 @@ async function readBody(req: IncomingMessage, limit: number): Promise<ParsedBody
   const declaredLength = req.headers['content-length'];
   if (typeof declaredLength === 'string') {
     const parsedLength = Number(declaredLength);
-    if (!Number.isFinite(parsedLength) || parsedLength < 0) throw new InvalidJsonError('Invalid Content-Length header.');
+    if (!Number.isFinite(parsedLength) || parsedLength < 0)
+      throw new InvalidJsonError('Invalid Content-Length header.');
     if (parsedLength > limit) {
       req.resume();
       throw new BodyTooLargeError();
@@ -153,7 +200,11 @@ async function readBody(req: IncomingMessage, limit: number): Promise<ParsedBody
   let size = 0;
   try {
     for await (const chunk of req) {
-      const buffer = Buffer.isBuffer(chunk) ? chunk : chunk instanceof Uint8Array ? Buffer.from(chunk) : Buffer.from(String(chunk));
+      const buffer = Buffer.isBuffer(chunk)
+        ? chunk
+        : chunk instanceof Uint8Array
+          ? Buffer.from(chunk)
+          : Buffer.from(String(chunk));
       size += buffer.byteLength;
       if (size > limit) {
         req.resume();
@@ -169,7 +220,11 @@ async function readBody(req: IncomingMessage, limit: number): Promise<ParsedBody
   if (size === 0) return { present: false, raw: Buffer.alloc(0) };
   const raw = Buffer.concat(chunks);
   const text = raw.toString('utf8');
-  const contentType = String(req.headers['content-type'] ?? '').split(';')[0]?.trim().toLowerCase() ?? '';
+  const contentType =
+    String(req.headers['content-type'] ?? '')
+      .split(';')[0]
+      ?.trim()
+      .toLowerCase() ?? '';
   if (contentType === 'application/json' || contentType.endsWith('+json')) {
     try {
       return { present: true, value: JSON.parse(text) as unknown, raw };
@@ -185,7 +240,12 @@ function issueStrings(issues: ValidationIssue[]): string[] {
   return issues.map((issue) => issue.message);
 }
 
-function problemResponse(status: number, title: string, detail: string, extra: Record<string, JsonValue> = {}): MockResponse {
+function problemResponse(
+  status: number,
+  title: string,
+  detail: string,
+  extra: Record<string, JsonValue> = {},
+): MockResponse {
   return {
     status,
     body: problem(status, title, detail, extra),
@@ -222,15 +282,26 @@ export async function createMockServer(options: CreateMockServerOptions): Promis
   });
   const logger = options.logger ?? createLogger();
   const inspectorRequested = options.inspector ?? config.inspector.enabled;
-  const inspectorEnabled = inspectorRequested === undefined ? isLoopback(config.host) : inspectorRequested;
-  if (!isLoopback(config.host) && !inspectorEnabled) {
-    logger.warn('The inspector API is disabled for a non-loopback bind. Use --inspector only on a trusted network.');
+  const inspectorEnabled =
+    inspectorRequested === undefined ? isLoopback(config.host) : inspectorRequested;
+  if (!isLoopback(config.host)) {
+    if (inspectorEnabled)
+      logger.warn(
+        'The inspector API is enabled on a non-loopback bind; use it only on a trusted network.',
+      );
+    else
+      logger.warn(
+        'The inspector API is disabled for a non-loopback bind. Use --inspector only on a trusted network.',
+      );
   }
-  if (['0.0.0.0', '::'].includes(config.host)) logger.warn(`Binding to ${config.host} exposes this mock server to the network.`);
+  if (['0.0.0.0', '::'].includes(config.host))
+    logger.warn(`Binding to ${config.host} exposes this mock server to the network.`);
 
   const routerState: { current: Router } = { current: createRouter(loaded.document) };
   const specState: { current: LoadedSpec } = { current: loaded };
-  const stateStoreState = { current: new ResourceStore(routerState.current, loaded.document, config) };
+  const stateStoreState = {
+    current: new ResourceStore(routerState.current, loaded.document, config),
+  };
   const recorder = new RequestRecorder(config, options.clock);
   const proxyExamples = new ProxyExampleRecorder(config.proxy.recordFile);
   const requestCounters = new Map<string, number>();
@@ -258,7 +329,16 @@ export async function createMockServer(options: CreateMockServerOptions): Promis
       applyCors(req, res, config);
       const failure = problemResponse(400, 'Bad Request', 'The request URL is malformed.');
       writeJson(res, failure.status, failure.body, failure.headers);
-      if (config.recording.enabled) recorder.record({ method, url: req.url ?? '/', headers: asHeaders(req.headers), responseStatus: failure.status, responseSource: 'error', durationMs: Math.max(0, (options.clock ?? (() => new Date()))().getTime() - started), validationErrors: ['Malformed request URL'] });
+      if (config.recording.enabled)
+        recorder.record({
+          method,
+          url: req.url ?? '/',
+          headers: asHeaders(req.headers),
+          responseStatus: failure.status,
+          responseSource: 'error',
+          durationMs: Math.max(0, (options.clock ?? (() => new Date()))().getTime() - started),
+          validationErrors: ['Malformed request URL'],
+        });
       return;
     }
     applyCors(req, res, config);
@@ -267,12 +347,17 @@ export async function createMockServer(options: CreateMockServerOptions): Promis
     let bodyPresent = false;
     let rawBody: Buffer<ArrayBufferLike> = Buffer.alloc(0);
     let route: MatchedRoute | undefined;
-    let response: MockResponse = problemResponse(500, 'Internal Server Error', 'Request processing did not complete.');
+    let response: MockResponse = problemResponse(
+      500,
+      'Internal Server Error',
+      'Request processing did not complete.',
+    );
     let validationErrors: string[] = [];
     let source: ResponseSource | 'error' | 'inspector' = 'error';
     let responseHeaders: Record<string, string> = {};
     const forward = async (matchedRoute?: MatchedRoute): Promise<MockResponse> => {
-      if (!config.proxy.url) return problemResponse(502, 'Bad Gateway', 'No proxy upstream is configured.');
+      if (!config.proxy.url)
+        return problemResponse(502, 'Bad Gateway', 'No proxy upstream is configured.');
       const proxied = await forwardRequest({
         upstream: config.proxy.url,
         method,
@@ -292,11 +377,16 @@ export async function createMockServer(options: CreateMockServerOptions): Promis
           body: proxied.body,
         });
       }
-      return { status: proxied.status, body: proxied.body, headers: proxied.headers, source: 'proxy' };
+      return {
+        status: proxied.status,
+        body: proxied.body,
+        headers: proxied.headers,
+        source: 'proxy',
+      };
     };
 
     try {
-      if (pathname.startsWith('/__mockline')) {
+      if (pathname === '/__mockline' || pathname.startsWith('/__mockline/')) {
         const inspectorResponse = await handleInspector(method, url, {
           enabled: inspectorEnabled,
           recorder,
@@ -306,10 +396,19 @@ export async function createMockServer(options: CreateMockServerOptions): Promis
           reset: resetRuntime,
         });
         response = inspectorResponse
-          ? { status: inspectorResponse.status, ...(inspectorResponse.body !== undefined ? { body: inspectorResponse.body } : {}), ...(inspectorResponse.headers ? { headers: inspectorResponse.headers } : {}), source: 'generated' }
+          ? {
+              status: inspectorResponse.status,
+              ...(inspectorResponse.body !== undefined ? { body: inspectorResponse.body } : {}),
+              ...(inspectorResponse.headers ? { headers: inspectorResponse.headers } : {}),
+              source: 'generated',
+            }
           : problemResponse(404, 'Not Found', 'The inspector endpoint does not exist.');
         source = 'inspector';
-      } else if (method === 'OPTIONS' && config.cors.enabled && req.headers['access-control-request-method']) {
+      } else if (
+        method === 'OPTIONS' &&
+        config.cors.enabled &&
+        req.headers['access-control-request-method']
+      ) {
         response = { status: 204, source: 'generated' };
         source = 'generated';
       } else {
@@ -331,72 +430,117 @@ export async function createMockServer(options: CreateMockServerOptions): Promis
               const methods = routerState.current.methodsForPath(pathname);
               const nearest = routerState.current.nearestPath(pathname);
               if (methods.length > 0) {
-                response = problemResponse(405, 'Method Not Allowed', `Method ${method} is not allowed for ${pathname}.`, nearest ? { nearestPath: nearest } : {});
+                response = problemResponse(
+                  405,
+                  'Method Not Allowed',
+                  `Method ${method} is not allowed for ${pathname}.`,
+                  nearest ? { nearestPath: nearest } : {},
+                );
                 responseHeaders = { Allow: methods.join(', ') };
               } else {
-                response = problemResponse(404, 'Not Found', nearest ? `No route matched. Nearest path: ${nearest}.` : `No route matched ${pathname}.`, nearest ? { nearestPath: nearest } : {});
+                response = problemResponse(
+                  404,
+                  'Not Found',
+                  nearest
+                    ? `No route matched. Nearest path: ${nearest}.`
+                    : `No route matched ${pathname}.`,
+                  nearest ? { nearestPath: nearest } : {},
+                );
               }
               source = 'error';
             }
           } else {
             if (read.parseError) throw new InvalidJsonError(read.parseError);
             route = match.route;
-          let authorized = true;
-          if (config.enforceAuth) {
-            const auth = checkSecurityPresence(specState.current.document, route.operation, asHeaders(req.headers), url);
-            authorized = auth.authorized;
-            if (!authorized) {
-              response = problemResponse(401, 'Unauthorized', 'A credential declared by the OpenAPI security scheme is required.', { errors: auth.missing });
-              responseHeaders = { 'www-authenticate': 'Bearer realm="Bearer"' };
-              source = 'error';
-            }
-          }
-          if (authorized) {
-            const validation = config.validate === 'off'
-              ? { valid: true, issues: [], bodyInvalid: false }
-              : validateRequest({ root: specState.current.document, route, params: match.params, url, headers: asHeaders(req.headers), body, bodyPresent });
-            const strictFailure = !validation.valid && config.validate === 'strict';
-            if (!validation.valid) {
-              validationErrors = issueStrings(validation.issues);
-              if (strictFailure) {
-                const status = strictValidationStatus(validation);
-                response = problemResponse(status, status === 422 ? 'Unprocessable Content' : 'Bad Request', 'Request validation failed.', {
-                  errors: validation.issues.map((issue) => ({ location: issue.location, message: issue.message })),
-                });
-                source = 'error';
-              } else if (config.validate === 'warn') {
-                responseHeaders['X-Mockline-Validation'] = 'failed';
-                for (const error of validationErrors) logger.warn(`${route.operationId}: ${error}`);
-              }
-            }
-            if (!strictFailure) {
-              const key = `${route.method} ${route.path}`;
-              const counter = requestCounters.get(key) ?? 0;
-              requestCounters.set(key, counter + 1);
-              const stateResponse = config.stateful.enabled
-                ? stateStoreState.current.handle(route, match.params, url, body)
-                : undefined;
-              const selected = selectResponse({
-                root: specState.current.document,
-                route,
-                config,
-                headers: asHeaders(req.headers),
+            let authorized = true;
+            if (config.enforceAuth) {
+              const auth = checkSecurityPresence(
+                specState.current.document,
+                route.operation,
+                asHeaders(req.headers),
                 url,
-                body,
-                requestCounter: counter,
-                sequenceIndexes,
-                stateResponse,
-              });
-              response = selected.response;
-              if (selected.sequenceKey) {
-                const index = sequenceIndexes.get(selected.sequenceKey) ?? 0;
-                sequenceIndexes.set(selected.sequenceKey, index + 1);
+              );
+              authorized = auth.authorized;
+              if (!authorized) {
+                response = problemResponse(
+                  401,
+                  'Unauthorized',
+                  'A credential declared by the OpenAPI security scheme is required.',
+                  { errors: auth.missing },
+                );
+                responseHeaders = { 'www-authenticate': 'Bearer realm="Bearer"' };
+                source = 'error';
               }
-              for (const warning of selected.warnings) logger.warn(`${route.operationId}: ${warning}`);
-              source = response.source;
-              if (responseHeaders['X-Mockline-Validation']) response = { ...response, headers: { ...response.headers, 'X-Mockline-Validation': 'failed' } };
             }
-          }
+            if (authorized) {
+              const validation =
+                config.validate === 'off'
+                  ? { valid: true, issues: [], bodyInvalid: false }
+                  : validateRequest({
+                      root: specState.current.document,
+                      route,
+                      params: match.params,
+                      url,
+                      headers: asHeaders(req.headers),
+                      body,
+                      bodyPresent,
+                    });
+              const strictFailure = !validation.valid && config.validate === 'strict';
+              if (!validation.valid) {
+                validationErrors = issueStrings(validation.issues);
+                if (strictFailure) {
+                  const status = strictValidationStatus(validation);
+                  response = problemResponse(
+                    status,
+                    status === 422 ? 'Unprocessable Content' : 'Bad Request',
+                    'Request validation failed.',
+                    {
+                      errors: validation.issues.map((issue) => ({
+                        location: issue.location,
+                        message: issue.message,
+                      })),
+                    },
+                  );
+                  source = 'error';
+                } else if (config.validate === 'warn') {
+                  responseHeaders['X-Mockline-Validation'] = 'failed';
+                  for (const error of validationErrors)
+                    logger.warn(`${route.operationId}: ${error}`);
+                }
+              }
+              if (!strictFailure) {
+                const key = `${route.method} ${route.path}`;
+                const counter = requestCounters.get(key) ?? 0;
+                requestCounters.set(key, counter + 1);
+                const stateResponse = config.stateful.enabled
+                  ? stateStoreState.current.handle(route, match.params, url, body)
+                  : undefined;
+                const selected = selectResponse({
+                  root: specState.current.document,
+                  route,
+                  config,
+                  headers: asHeaders(req.headers),
+                  url,
+                  body,
+                  requestCounter: counter,
+                  sequenceIndexes,
+                  stateResponse,
+                });
+                response = selected.response;
+                if (selected.sequenceKey) {
+                  const index = sequenceIndexes.get(selected.sequenceKey) ?? 0;
+                  sequenceIndexes.set(selected.sequenceKey, index + 1);
+                }
+                for (const warning of selected.warnings)
+                  logger.warn(`${route.operationId}: ${warning}`);
+                source = response.source;
+                if (responseHeaders['X-Mockline-Validation'])
+                  response = {
+                    ...response,
+                    headers: { ...response.headers, 'X-Mockline-Validation': 'failed' },
+                  };
+              }
+            }
           }
         }
       }
@@ -409,7 +553,11 @@ export async function createMockServer(options: CreateMockServerOptions): Promis
         validationErrors = [error.message];
       } else {
         logger.error(error instanceof Error ? error.message : String(error));
-        response = problemResponse(500, 'Internal Server Error', 'Mockline could not process this request.');
+        response = problemResponse(
+          500,
+          'Internal Server Error',
+          'Mockline could not process this request.',
+        );
       }
       source = 'error';
     }
@@ -421,7 +569,11 @@ export async function createMockServer(options: CreateMockServerOptions): Promis
       writeJson(res, response.status, response.body, headers, method === 'HEAD');
     } catch (error) {
       if (!res.destroyed && !res.headersSent) {
-        const failure = problem(500, 'Internal Server Error', error instanceof Error ? error.message : 'Response failed.');
+        const failure = problem(
+          500,
+          'Internal Server Error',
+          error instanceof Error ? error.message : 'Response failed.',
+        );
         writeJson(res, 500, failure, { 'content-type': 'application/problem+json' });
         source = 'error';
       }
@@ -447,13 +599,16 @@ export async function createMockServer(options: CreateMockServerOptions): Promis
     void handler(req, res).catch((error: unknown) => {
       if (!res.destroyed && !res.headersSent) {
         const detail = error instanceof Error ? error.message : 'Unexpected request failure.';
-        writeJson(res, 500, problem(500, 'Internal Server Error', detail), { 'content-type': 'application/problem+json' });
+        writeJson(res, 500, problem(500, 'Internal Server Error', detail), {
+          'content-type': 'application/problem+json',
+        });
       }
     });
   });
   setServerRequestTimeout(httpServer, config.requestTimeoutMs);
   httpServer.on('clientError', (_error, socket) => {
-    if (socket.writable && !socket.destroyed) socket.end('HTTP/1.1 400 Bad Request\r\nConnection: close\r\nContent-Length: 0\r\n\r\n');
+    if (socket.writable && !socket.destroyed)
+      socket.end('HTTP/1.1 400 Bad Request\r\nConnection: close\r\nContent-Length: 0\r\n\r\n');
     else socket.destroy();
   });
 
@@ -472,8 +627,15 @@ export async function createMockServer(options: CreateMockServerOptions): Promis
       httpServer.listen(config.port, config.host);
     });
   } catch (error) {
-    const code = isRecord(error) && error.code === 'EADDRINUSE' ? 'Port is already in use' : 'Could not start server';
-    throw new MocklineError(`${code} (${config.host}:${config.port}): ${error instanceof Error ? error.message : String(error)}`, 3, error);
+    const code =
+      isRecord(error) && error.code === 'EADDRINUSE'
+        ? 'Port is already in use'
+        : 'Could not start server';
+    throw new MocklineError(
+      `${code} (${config.host}:${config.port}): ${error instanceof Error ? error.message : String(error)}`,
+      3,
+      error,
+    );
   }
   const address = httpServer.address();
   const actualPort = address && typeof address !== 'string' ? address.port : config.port;
@@ -498,7 +660,9 @@ export async function createMockServer(options: CreateMockServerOptions): Promis
         sequenceIndexes.clear();
         logger.info(`Reloaded OpenAPI spec ${options.spec}`);
       } catch (error) {
-        logger.error(`Invalid OpenAPI change; keeping the last good spec: ${error instanceof Error ? error.message : String(error)}`);
+        logger.error(
+          `Invalid OpenAPI change; keeping the last good spec: ${error instanceof Error ? error.message : String(error)}`,
+        );
       }
     };
     const reloadConfiguration = async (): Promise<void> => {
@@ -507,11 +671,19 @@ export async function createMockServer(options: CreateMockServerOptions): Promis
           ? await options.reloadConfig()
           : (await loadConfig(options.configFile)).config;
         if (loadedConfig.port !== boundPort || loadedConfig.host !== boundHost) {
-          logger.warn('Hot reload cannot change the bound host or port; keeping the original listener address.');
+          logger.warn(
+            'Hot reload cannot change the bound host or port; keeping the original listener address.',
+          );
         }
-        const nextConfig = configSchema.parse({ ...loadedConfig, port: boundPort, host: boundHost });
-        const stateChanged = config.seed !== nextConfig.seed
-          || JSON.stringify(config.stateful) !== JSON.stringify(nextConfig.stateful);
+        const nextConfig = configSchema.parse({
+          ...loadedConfig,
+          port: boundPort,
+          host: boundHost,
+        });
+        const stateChanged =
+          config.seed !== nextConfig.seed ||
+          JSON.stringify(config.stateful) !== JSON.stringify(nextConfig.stateful) ||
+          JSON.stringify(config.generation) !== JSON.stringify(nextConfig.generation);
         config = nextConfig;
         recorder.setConfig(config);
         proxyExamples.setFile(config.proxy.recordFile);
@@ -520,7 +692,9 @@ export async function createMockServer(options: CreateMockServerOptions): Promis
         setServerRequestTimeout(httpServer, config.requestTimeoutMs);
         logger.info('Reloaded Mockline configuration');
       } catch (error) {
-        logger.error(`Invalid config change; keeping the last good config: ${error instanceof Error ? error.message : String(error)}`);
+        logger.error(
+          `Invalid config change; keeping the last good config: ${error instanceof Error ? error.message : String(error)}`,
+        );
       }
     };
     const schedule = (kind: 'spec' | 'config'): void => {
@@ -569,7 +743,7 @@ export async function createMockServer(options: CreateMockServerOptions): Promis
       if (configReloadTimer) clearTimeout(configReloadTimer);
       await watcher?.close();
       await new Promise<void>((resolve, reject) => {
-        httpServer.close((error) => error ? reject(error) : resolve());
+        httpServer.close((error) => (error ? reject(error) : resolve()));
       });
       await recorder.flush();
       await proxyExamples.flush();

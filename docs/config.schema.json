@@ -136,10 +136,6 @@
               "type": "string",
               "minLength": 1,
               "default": "id"
-            },
-            "sequenceLoop": {
-              "type": "boolean",
-              "default": false
             }
           },
           "additionalProperties": false,
@@ -406,7 +402,41 @@
           "type": "object",
           "properties": {
             "hints": {
-              "type": "boolean",
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "object",
+                  "additionalProperties": {
+                    "anyOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "number"
+                      },
+                      {
+                        "type": "boolean"
+                      },
+                      {
+                        "type": "null"
+                      },
+                      {
+                        "type": "array",
+                        "items": {
+                          "type": [
+                            "string",
+                            "number",
+                            "boolean",
+                            "null"
+                          ]
+                        }
+                      }
+                    ]
+                  }
+                }
+              ],
               "default": true
             },
             "counter": {

@@ -1,0 +1,47 @@
+openapi: 3.0.3
+info:
+  title: Schema-only fixture
+  version: 1.0.0
+paths:
+  /users:
+    get:
+      operationId: listUsers
+      responses:
+        '200':
+          description: Generated users
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/User' }
+  /users/{id}:
+    get:
+      operationId: getUser
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        '200':
+          description: A generated user
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/User' }
+components:
+  schemas:
+    User:
+      type: object
+      required: [id, firstName, email, status, labels]
+      properties:
+        id: { type: integer, minimum: 1 }
+        firstName: { type: string }
+        email: { type: string, format: email }
+        status: { type: string, enum: [active, pending, disabled] }
+        age: { type: integer, minimum: 0, maximum: 120 }
+        labels:
+          type: array
+          minItems: 2
+          maxItems: 4
+          uniqueItems: true
+          items: { type: string, pattern: '^[A-Z]{3}$' }

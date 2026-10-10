@@ -14,8 +14,9 @@ export function defaultStatus(responses: Record<string, ApiResponse> | undefined
 
 function hasExample(response: ApiResponse | undefined): boolean {
   if (!response?.content) return false;
-  return Object.values(response.content).some((media) =>
-    'example' in media || Boolean(media.examples && Object.keys(media.examples).length > 0),
+  return Object.values(response.content).some(
+    (media) =>
+      'example' in media || Boolean(media.examples && Object.keys(media.examples).length > 0),
   );
 }
 
@@ -25,8 +26,16 @@ export function summarizeSpec(spec: LoadedSpec, overrideKeys: string[] = []): Su
     const responses = route.operation.responses;
     const status = defaultStatus(responses);
     const response = responses?.[status] ?? responses?.default;
-    const override = overrideKeys.some((key) => key === route.operationId || key.toUpperCase() === `${route.method} ${route.path}`.toUpperCase());
-    const source: SummaryOperation['source'] = override ? 'override' : hasExample(response) ? 'example' : 'schema generation';
+    const override = overrideKeys.some(
+      (key) =>
+        key === route.operationId ||
+        key.toUpperCase() === `${route.method} ${route.path}`.toUpperCase(),
+    );
+    const source: SummaryOperation['source'] = override
+      ? 'override'
+      : hasExample(response)
+        ? 'example'
+        : 'schema generation';
     return {
       method: route.method,
       path: route.path,

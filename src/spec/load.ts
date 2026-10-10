@@ -22,7 +22,9 @@ function isRecord(value: unknown): value is UnknownRecord {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
-function operationEntries(document: OpenApiDocument): Array<{ path: string; method: string; operation: UnknownRecord }> {
+function operationEntries(
+  document: OpenApiDocument,
+): Array<{ path: string; method: string; operation: UnknownRecord }> {
   const entries: Array<{ path: string; method: string; operation: UnknownRecord }> = [];
   const paths = document.paths ?? {};
   const methods = new Set(['get', 'put', 'post', 'delete', 'options', 'head', 'patch', 'trace']);
@@ -45,7 +47,10 @@ function getResponseDetails(operation: UnknownRecord): { hasExample: boolean; ha
     if (!isRecord(responseUnknown) || !isRecord(responseUnknown.content)) continue;
     for (const mediaUnknown of Object.values(responseUnknown.content)) {
       if (!isRecord(mediaUnknown)) continue;
-      if ('example' in mediaUnknown || isRecord(mediaUnknown.examples) && Object.keys(mediaUnknown.examples).length > 0) {
+      if (
+        'example' in mediaUnknown ||
+        (isRecord(mediaUnknown.examples) && Object.keys(mediaUnknown.examples).length > 0)
+      ) {
         hasExample = true;
       }
       if (isRecord(mediaUnknown.schema)) hasSchema = true;
@@ -58,17 +63,48 @@ export function inspectSpec(document: OpenApiDocument): SpecWarning[] {
   const warnings: SpecWarning[] = [];
   for (const entry of operationEntries(document)) {
     const { hasExample, hasSchema } = getResponseDetails(entry.operation);
+    const responses = isRecord(entry.operation.responses) ? entry.operation.responses : {};
+    for (const response of Object.values(responses)) {
+      if (!isRecord(response) || !isRecord(response.content)) continue;
+      for (const [mediaType, media] of Object.entries(response.content)) {
+        if (!isRecord(media)) continue;
+        const json = mediaType.toLowerCase().includes('json');
+        const schema = isRecord(media.schema) ? media.schema : undefined;
+        const hasMediaExample =
+          'example' in media ||
+          (isRecord(media.examples) && Object.keys(media.examples).length > 0) ||
+          Boolean(
+            schema &&
+            ('example' in schema || (Array.isArray(schema.examples) && schema.examples.length > 0)),
+          );
+        if (!json && !hasMediaExample)
+          warnings.push({
+            message: `Mockline cannot generate ${mediaType} responses; add an example.`,
+            path: entry.path,
+          });
+      }
+    }
     if (!hasExample && !hasSchema) {
       warnings.push({
         message: 'No response schema or example; Mockline can only return an empty/default body.',
-        operationId: typeof entry.operation.operationId === 'string' ? entry.operation.operationId : undefined,
+        operationId:
+          typeof entry.operation.operationId === 'string' ? entry.operation.operationId : undefined,
         path: entry.path,
       });
     }
-    if (entry.operation.callbacks) warnings.push({ message: 'Callbacks are not supported.', path: entry.path });
-    if (entry.operation.links) warnings.push({ message: 'Response links are ignored by the mock server.', path: entry.path });
+    if (entry.operation.callbacks)
+      warnings.push({ message: 'Callbacks are not supported.', path: entry.path });
+    if (entry.operation.links)
+      warnings.push({
+        message: 'Response links are ignored by the mock server.',
+        path: entry.path,
+      });
   }
-  if (document.webhooks && isRecord(document.webhooks) && Object.keys(document.webhooks).length > 0) {
+  if (
+    document.webhooks &&
+    isRecord(document.webhooks) &&
+    Object.keys(document.webhooks).length > 0
+  ) {
     warnings.push({ message: 'Webhooks are not served by Mockline.' });
   }
   return warnings;
@@ -85,12 +121,13 @@ export async function loadSpec(file: string): Promise<LoadedSpec> {
   }
   let parsed: unknown;
   try {
-    parsed = /\.json$/i.test(absoluteFile) ? JSON.parse(text) as unknown : parseYaml(text);
+    parsed = /\.json$/i.test(absoluteFile) ? (JSON.parse(text) as unknown) : parseYaml(text);
   } catch (error) {
     const reason = error instanceof Error ? error.message : String(error);
     throw new MocklineError(`Cannot parse OpenAPI spec ${file}: ${reason}`, 1);
   }
-  if (!isRecord(parsed)) throw new MocklineError('OpenAPI document must be a YAML or JSON object.', 1);
+  if (!isRecord(parsed))
+    throw new MocklineError('OpenAPI document must be a YAML or JSON object.', 1);
   if (parsed.swagger === '2.0' || 'swagger' in parsed) {
     throw new MocklineError(
       'Swagger 2.0 is not supported. Convert the document to OpenAPI 3.x (for example, with swagger2openapi) and try again.',
@@ -104,7 +141,9 @@ export async function loadSpec(file: string): Promise<LoadedSpec> {
   let dereferenced: OpenApiDocument;
   try {
     const parser = new SwaggerParser();
-    dereferenced = await parser.validate(absoluteFile, { dereference: { circular: 'ignore' } }) as unknown as OpenApiDocument;
+    dereferenced = (await parser.validate(absoluteFile, {
+      dereference: { circular: 'ignore' },
+    })) as unknown as OpenApiDocument;
   } catch (error) {
     const reason = error instanceof Error ? error.message : String(error);
     throw new MocklineError(`Invalid OpenAPI spec ${file}: ${reason}`, 1, error);

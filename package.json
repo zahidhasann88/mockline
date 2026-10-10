@@ -25,13 +25,18 @@
   },
   "files": [
     "dist",
+    "docs",
+    "examples",
     "README.md",
     "LICENSE",
-    "docs/config.schema.json"
+    "CHANGELOG.md",
+    "CODE_OF_CONDUCT.md",
+    "CONTRIBUTING.md",
+    "SECURITY.md"
   ],
   "repository": {
     "type": "git",
-    "url": "https://github.com/YOUR_GITHUB_USERNAME/mockline.git"
+    "url": "git+https://github.com/YOUR_GITHUB_USERNAME/mockline.git"
   },
   "bugs": {
     "url": "https://github.com/YOUR_GITHUB_USERNAME/mockline/issues"
@@ -52,16 +57,17 @@
   "scripts": {
     "build": "tsup",
     "clean": "rm -rf dist coverage",
-    "lint": "eslint src scripts *.ts eslint.config.js",
+    "lint": "eslint src tests scripts *.ts eslint.config.js",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run --coverage",
+    "test": "tsup && vitest run --coverage",
     "test:watch": "vitest",
     "schema:config": "tsx scripts/generate-config-schema.ts",
     "publint": "publint",
-    "attw": "attw --pack",
-    "benchmark": "tsx scripts/benchmark.ts"
+    "attw": "attw --pack --profile esm-only",
+    "benchmark": "tsx scripts/benchmark.ts",
+    "pack:check": "tsup && node scripts/verify-pack.mjs"
   },
   "dependencies": {
     "@apidevtools/swagger-parser": "^12.1.0",

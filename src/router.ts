@@ -1,4 +1,11 @@
-import type { ApiOperation, ApiParameter, ApiPathItem, MatchedRoute, OpenApiDocument, UnknownRecord } from './types.js';
+import type {
+  ApiOperation,
+  ApiParameter,
+  ApiPathItem,
+  MatchedRoute,
+  OpenApiDocument,
+  UnknownRecord,
+} from './types.js';
 
 const HTTP_METHODS = ['get', 'put', 'post', 'delete', 'options', 'head', 'patch', 'trace'] as const;
 
@@ -31,8 +38,13 @@ export function normalizePath(value: string): string {
   return trimmed || '/';
 }
 
-function replaceServerVariables(url: string, variables: Record<string, { default?: string }> | undefined): string {
-  return url.replace(/\{([^}]+)\}/g, (_match, name: string) => encodeURIComponent(variables?.[name]?.default ?? ''));
+function replaceServerVariables(
+  url: string,
+  variables: Record<string, { default?: string }> | undefined,
+): string {
+  return url.replace(/\{([^}]+)\}/g, (_match, name: string) =>
+    encodeURIComponent(variables?.[name]?.default ?? ''),
+  );
 }
 
 function serverPath(url: string, variables?: Record<string, { default?: string }>): string {
@@ -50,22 +62,34 @@ function routeForPath(base: string, pathTemplate: string): string {
   return normalizePath(`${cleanBase}${cleanPath === '/' ? '' : cleanPath}`);
 }
 
-function compilePath(template: string): { regex: RegExp; parameterNames: string[]; staticSegments: number; score: number } {
+function compilePath(template: string): {
+  regex: RegExp;
+  parameterNames: string[];
+  staticSegments: number;
+  score: number;
+} {
   const normalized = normalizePath(template);
   const parts = normalized.split('/').filter(Boolean);
   const names: string[] = [];
   let staticSegments = 0;
-  const pattern = parts.map((part) => {
-    const match = /^\{([^{}]+)\}$/.exec(part);
-    if (match) {
-      names.push(match[1] ?? '');
-      return '([^/]+)';
-    }
-    staticSegments += 1;
-    return part.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  }).join('/');
+  const pattern = parts
+    .map((part) => {
+      const match = /^\{([^{}]+)\}$/.exec(part);
+      if (match) {
+        names.push(match[1] ?? '');
+        return '([^/]+)';
+      }
+      staticSegments += 1;
+      return part.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    })
+    .join('/');
   const regex = new RegExp(`^/${pattern}${parts.length === 0 ? '' : ''}/?$`);
-  return { regex, parameterNames: names, staticSegments, score: staticSegments * 100 + parts.length };
+  return {
+    regex,
+    parameterNames: names,
+    staticSegments,
+    score: staticSegments * 100 + parts.length,
+  };
 }
 
 function toMatchedRoute(route: CompiledRoute): MatchedRoute {
@@ -107,10 +131,23 @@ export function createRouter(document: OpenApiDocument): Router {
       const operationUnknown = pathItemUnknown[method];
       if (!isRecord(operationUnknown)) continue;
       const operation = operationUnknown as ApiOperation;
-      const operationServers = Array.isArray(operation.servers) ? operation.servers as Array<{ url: string; variables?: Record<string, { default?: string }> }> : undefined;
-      const pathServers = Array.isArray(pathItem.servers) ? pathItem.servers as Array<{ url: string; variables?: Record<string, { default?: string }> }> : undefined;
+      const operationServers = Array.isArray(operation.servers)
+        ? (operation.servers as Array<{
+            url: string;
+            variables?: Record<string, { default?: string }>;
+          }>)
+        : undefined;
+      const pathServers = Array.isArray(pathItem.servers)
+        ? (pathItem.servers as Array<{
+            url: string;
+            variables?: Record<string, { default?: string }>;
+          }>)
+        : undefined;
       const servers = operationServers ?? pathServers ?? document.servers ?? [];
-      const bases = servers.length > 0 ? servers.map((server) => serverPath(server.url, server.variables)) : ['/'];
+      const bases =
+        servers.length > 0
+          ? servers.map((server) => serverPath(server.url, server.variables))
+          : ['/'];
       for (const base of bases) {
         const routePath = routeForPath(base, pathTemplate);
         const compiled = compilePath(routePath);
@@ -130,10 +167,16 @@ export function createRouter(document: OpenApiDocument): Router {
       }
     }
   }
-  routes.sort((a, b) => b.staticSegments - a.staticSegments || b.score - a.score || a.path.localeCompare(b.path));
+  routes.sort(
+    (a, b) =>
+      b.staticSegments - a.staticSegments || b.score - a.score || a.path.localeCompare(b.path),
+  );
   const publicRoutes = routes.map(toMatchedRoute);
 
-  const matchesPath = (route: CompiledRoute, pathname: string): Record<string, string> | undefined => {
+  const matchesPath = (
+    route: CompiledRoute,
+    pathname: string,
+  ): Record<string, string> | undefined => {
     const normalized = normalizePath(pathname);
     const match = route.regex.exec(normalized);
     if (!match) return undefined;
@@ -176,7 +219,8 @@ export function createRouter(document: OpenApiDocument): Router {
         const actualParts = normalized.split('/').filter(Boolean);
         let common = 0;
         for (let i = 0; i < Math.min(routeParts.length, actualParts.length); i += 1) {
-          if (routeParts[i] === actualParts[i] || /^\{[^{}]+\}$/.test(routeParts[i] ?? '')) common += 1;
+          if (routeParts[i] === actualParts[i] || /^\{[^{}]+\}$/.test(routeParts[i] ?? ''))
+            common += 1;
           else break;
         }
         const distance = common * 10 - Math.abs(routeParts.length - actualParts.length);
