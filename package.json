@@ -71,29 +71,29 @@
     "demo": "pnpm build \u0026\u0026 node scripts/demo.mjs"
   },
   "dependencies": {
-    "@apidevtools/swagger-parser": "^12.1.0",
-    "@faker-js/faker": "^9.9.0",
+    "@apidevtools/swagger-parser": "^13.1.0",
+    "@faker-js/faker": "^10.6.0",
     "ajv": "^8.17.1",
     "ajv-formats": "^3.0.1",
-    "cac": "^6.7.14",
-    "chokidar": "^4.0.3",
+    "cac": "^7.0.0",
+    "chokidar": "^5.0.0",
     "picocolors": "^1.1.1",
     "yaml": "^2.7.0",
-    "zod": "^3.25.76"
+    "zod": "^4.6.5"
   },
   "devDependencies": {
     "@arethetypeswrong/cli": "^0.18.2",
-    "@eslint/js": "^9.26.0",
-    "@types/node": "^22.15.0",
-    "@vitest/coverage-v8": "^3.1.4",
-    "eslint": "^9.26.0",
+    "@eslint/js": "^10.0.1",
+    "@types/node": "^26.6.4",
+    "@vitest/coverage-v8": "^5.0.3",
+    "eslint": "^10.12.0",
     "prettier": "^3.5.3",
     "publint": "^0.3.12",
     "tsup": "^8.4.0",
     "tsx": "^4.19.4",
-    "typescript": "^5.8.3",
+    "typescript": "^6.0.3",
     "typescript-eslint": "^8.31.0",
-    "vitest": "^3.1.4",
+    "vitest": "^5.0.3",
     "zod-to-json-schema": "^3.24.5"
   },
   "author": "Zahid Hasan \u003cjahidhasann67@gmail.com\u003e"
