@@ -1,7 +1,7 @@
 # Releasing Mockline
 
-GitHub repository: zahidhasann88/mockline. npm package: @zahidhasann/mockline.
-The CLI remains mockline. The npm account must own the zahidhasann scope.
+GitHub repository: zahidhasann88/mockline. npm package: @zahid15/mockline.
+The CLI remains mockline. The npm account must own the zahid15 scope.
 
 ## First npm publication
 

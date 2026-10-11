@@ -12,7 +12,7 @@ jobs:
           node-version: 22
       - name: Start Mockline (after its first npm release)
         run: |
-          npm install --global @zahidhasann/mockline@0.1.0
+          npm install --global @zahid15/mockline@0.1.0
           mockline serve examples/petstore/openapi.yaml --port 4010 --seed 42 > mockline.log 2>&1 &
           for attempt in $(seq 1 30); do
             if curl --fail --silent http://127.0.0.1:4010/__mockline/health; then exit 0; fi

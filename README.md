@@ -5,7 +5,7 @@ an OpenAPI 3 document to serve documented routes, choose examples or generate
 schema-conforming responses, validate requests, and optionally keep CRUD state
 in memory. It uses Node's built-in HTTP server and binds to loopback by default.
 
-> **npm package:** `@zahidhasann/mockline`. The unscoped name is already taken;
+> **npm package:** `@zahid15/mockline`. The unscoped name is already taken;
 > the command is still `mockline`. Use the local build until the first release.
 
 ## Highlights
@@ -45,7 +45,7 @@ Route listings show each operation's default response status and whether its res
 After the first npm release:
 
 ```sh
-npm install --global @zahidhasann/mockline
+npm install --global @zahid15/mockline
 mockline --help
 ```
 
@@ -206,7 +206,7 @@ passwords, scopes, or certificates and is not an authorization system.
 ## Programmatic API
 
 ```ts
-import { createMockServer } from '@zahidhasann/mockline';
+import { createMockServer } from '@zahid15/mockline';
 
 const server = await createMockServer({
   spec: './openapi.yaml',
@@ -240,7 +240,7 @@ A Vitest test can assert recorded requests without a global server:
 
 ```ts
 import { expect, it } from 'vitest';
-import { createMockServer } from '@zahidhasann/mockline';
+import { createMockServer } from '@zahid15/mockline';
 
 it('records a request', async () => {
   const server = await createMockServer({ spec: './openapi.yaml', port: 0 });
