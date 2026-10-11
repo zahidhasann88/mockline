@@ -10,7 +10,7 @@
   },
   "packageManager": "pnpm@9.15.9",
   "bin": {
-    "mockline": "./dist/cli.js"
+    "mockline": "dist/cli.js"
   },
   "types": "./dist/index.d.ts",
   "exports": {
