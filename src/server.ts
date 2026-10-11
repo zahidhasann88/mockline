@@ -344,7 +344,7 @@ export async function createMockServer(options: CreateMockServerOptions): Promis
     applyCors(req, res, config);
     const pathname = normalizePath(url.pathname);
     let body: unknown;
-    let bodyPresent = false;
+    let bodyPresent: boolean;
     let rawBody: Buffer<ArrayBufferLike> = Buffer.alloc(0);
     let route: MatchedRoute | undefined;
     let response: MockResponse = problemResponse(

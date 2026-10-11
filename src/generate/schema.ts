@@ -176,14 +176,12 @@ function generateSimplePattern(pattern: string, rng: SeededRandom): string | und
   let output = '';
   for (let index = 0; index < source.length;) {
     let choices: string[];
-    let atom = '';
     const char = source[index] ?? '';
     if (char === '[') {
       const end = source.indexOf(']', index + 1);
       if (end < 0 || source[index + 1] === '^') return undefined;
       choices = expandCharacterClass(source.slice(index + 1, end)) ?? [];
       if (choices.length === 0) return undefined;
-      atom = source.slice(index, end + 1);
       index = end + 1;
     } else if (char === '\\') {
       const next = source[index + 1];
@@ -193,17 +191,14 @@ function generateSimplePattern(pattern: string, rng: SeededRandom): string | und
       else if (next === 's') choices = [' '];
       else if (next) choices = [next];
       else return undefined;
-      atom = `\\${next ?? ''}`;
       index += 2;
     } else if (char === '.') {
       choices = ['a', 'b', 'x', '7'];
-      atom = '.';
       index += 1;
     } else if ('*+?{}[]()'.includes(char)) {
       return undefined;
     } else {
       choices = [char];
-      atom = char;
       index += 1;
     }
 
@@ -229,7 +224,6 @@ function generateSimplePattern(pattern: string, rng: SeededRandom): string | und
       maximum = 1;
       index += 1;
     }
-    void atom;
     const count = rng.int(minimum, maximum);
     for (let repeat = 0; repeat < count; repeat += 1) output += rng.pick(choices) ?? 'x';
   }
