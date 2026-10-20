@@ -10,8 +10,4 @@ coverage
 *.log
 .env*
 
-build-docs.txt
-build-report.txt
-PUBLISHING.md
-VERIFICATION.md
 demo-output

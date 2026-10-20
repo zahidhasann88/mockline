@@ -1,8 +1,4 @@
 pnpm-lock.yaml
 docs/config.schema.json
 
-build-docs.txt
-build-report.txt
-PUBLISHING.md
-VERIFICATION.md
 demo-output/

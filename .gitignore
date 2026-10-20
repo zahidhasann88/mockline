@@ -12,10 +12,6 @@ coverage/
 mockline-records.jsonl
 .env*
 
-# Local review and demo files
-build-docs.txt
-build-report.txt
-PUBLISHING.md
-VERIFICATION.md
+# Demo output
 demo-output/
 .env.*
