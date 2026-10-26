@@ -28,7 +28,7 @@ export {
 export type { GenerationOptions, GeneratorWarning } from './generate/index.js';
 export { validateRequest, checkSecurityPresence } from './validate.js';
 export { ResourceStore, detectCollections } from './state/index.js';
-export type { ResourceCollection } from './state/index.js';
+export type { ResourceCollection, ResourceStoreOptions, StateData } from './state/index.js';
 export type {
   ValidationIssue,
   RequestValidationInput,

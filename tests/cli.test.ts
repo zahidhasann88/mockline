@@ -81,9 +81,14 @@ describe('CLI', () => {
     const directory = await mkdtemp(join(tmpdir(), 'mockline-init-'));
     const previous = process.cwd();
     const output = vi.spyOn(console, 'log').mockImplementation(() => undefined);
+    const errors = vi.spyOn(console, 'error').mockImplementation(() => undefined);
     try {
       process.chdir(directory);
+      expect(await runCli(['routes'])).toBe(2);
+      expect(String(errors.mock.calls.at(-1)?.[1])).toContain('No spec file given');
       expect(await runCli(['init'])).toBe(0);
+      expect(await runCli(['routes'])).toBe(0);
+      expect(output.mock.calls.some((call) => String(call[0]).includes('listPets'))).toBe(true);
       expect((await readFile(join(directory, 'mockline.yaml'), 'utf8')).startsWith('#')).toBe(true);
       expect(
         (await readFile(join(directory, 'openapi.yaml'), 'utf8')).includes('openapi: 3.0.3'),
@@ -93,6 +98,7 @@ describe('CLI', () => {
     } finally {
       process.chdir(previous);
       output.mockRestore();
+      errors.mockRestore();
       await rm(directory, { recursive: true, force: true });
     }
   });

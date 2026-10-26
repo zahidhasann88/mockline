@@ -73,6 +73,8 @@ export const configSchema = z.object({
       enabled: z.boolean().default(false),
       seedItems: z.number().int().min(0).default(3),
       idProperty: z.string().min(1).default('id'),
+      seed: z.string().min(1).optional(),
+      file: z.string().min(1).optional(),
     })
     .default({}),
   overrides: z.record(overrideSchema).default({}),

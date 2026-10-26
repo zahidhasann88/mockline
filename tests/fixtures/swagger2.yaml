@@ -2,9 +2,22 @@ swagger: '2.0'
 info:
   title: Legacy
   version: 1.0.0
+basePath: /api
 paths:
   /pets:
     get:
+      operationId: listPets
+      produces: [application/json]
       responses:
         '200':
           description: OK
+          schema:
+            type: array
+            items: { $ref: '#/definitions/Pet' }
+definitions:
+  Pet:
+    type: object
+    required: [id, name]
+    properties:
+      id: { type: integer }
+      name: { type: string }

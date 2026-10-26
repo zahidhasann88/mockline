@@ -1,5 +1,25 @@
 # Changelog
 
+## [Unreleased]
+
+### Added
+
+- Save stateful data to a JSON file with `--state-file` (`stateful.file`).
+- Start collections from your own data with `--seed-data` (`stateful.seed`).
+- Nested collections such as `/users/{userId}/posts`, with items kept per parent.
+- Id properties named after the path parameter (`petId`), `uuid` or `_id`.
+- Filter lists by item fields, e.g. `GET /pets?tag=dog`.
+- Swagger 2.0 support (converted to OpenAPI 3 on load).
+- Test helpers: `useMockline()` and the `toHaveReceived` matcher from
+  `@zahid15/mockline/testing`.
+- `mockline serve` logs each request.
+- `serve`, `routes` and `validate` use `openapi.yaml` from the current folder when
+  no file is given.
+
+### Fixed
+
+- Column alignment in `mockline routes` output.
+
 ## [0.1.1] - 2026-10-11
 
 ### Changed

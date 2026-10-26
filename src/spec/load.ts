@@ -1,6 +1,7 @@
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 import SwaggerParser from '@apidevtools/swagger-parser';
+import swagger2openapi from 'swagger2openapi';
 import { parse as parseYaml } from 'yaml';
 import { MocklineError } from '../errors.js';
 import type { OpenApiDocument, UnknownRecord } from '../types.js';
@@ -128,20 +129,25 @@ export async function loadSpec(file: string): Promise<LoadedSpec> {
   }
   if (!isRecord(parsed))
     throw new MocklineError('OpenAPI document must be a YAML or JSON object.', 1);
-  if (parsed.swagger === '2.0' || 'swagger' in parsed) {
-    throw new MocklineError(
-      'Swagger 2.0 is not supported. Convert the document to OpenAPI 3.x (for example, with swagger2openapi) and try again.',
-      1,
-    );
+  const converted = 'swagger' in parsed;
+  if (converted) {
+    if (parsed.swagger !== '2.0')
+      throw new MocklineError('Only Swagger 2.0 and OpenAPI 3.x documents are supported.', 1);
+    try {
+      parsed = (await swagger2openapi.convertObj(parsed, { patch: true, warnOnly: true })).openapi;
+    } catch (error) {
+      const reason = error instanceof Error ? error.message : String(error);
+      throw new MocklineError(`Cannot convert Swagger 2.0 spec ${file}: ${reason}`, 1, error);
+    }
   }
-  if (typeof parsed.openapi !== 'string' || !parsed.openapi.startsWith('3.')) {
+  if (!isRecord(parsed) || typeof parsed.openapi !== 'string' || !parsed.openapi.startsWith('3.')) {
     throw new MocklineError('Only OpenAPI 3.0 and 3.1 documents are supported.', 1);
   }
 
   let dereferenced: OpenApiDocument;
   try {
     const parser = new SwaggerParser();
-    dereferenced = (await parser.validate(absoluteFile, {
+    dereferenced = (await parser.validate(absoluteFile, parsed as never, {
       dereference: { circular: 'ignore' },
     })) as unknown as OpenApiDocument;
   } catch (error) {
@@ -150,5 +156,6 @@ export async function loadSpec(file: string): Promise<LoadedSpec> {
   }
   const document = dereferenced;
   const warnings = inspectSpec(document);
+  if (converted) warnings.unshift({ message: 'Converted from Swagger 2.0 to OpenAPI 3.0.' });
   return { file: absoluteFile, document, dereferenced, warnings };
 }

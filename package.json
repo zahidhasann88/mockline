@@ -18,6 +18,10 @@
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
     },
+    "./testing": {
+      "types": "./dist/testing.d.ts",
+      "import": "./dist/testing.js"
+    },
     "./cli": {
       "import": "./dist/cli.js"
     },
@@ -73,6 +77,7 @@
     "cac": "^6.7.14",
     "chokidar": "^4.0.3",
     "picocolors": "^1.1.1",
+    "swagger2openapi": "^7.0.8",
     "yaml": "^2.7.0",
     "zod": "^3.25.76"
   },

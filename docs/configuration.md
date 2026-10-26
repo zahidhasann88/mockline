@@ -1,156 +1,135 @@
 # Configuration
 
-Mockline loads the file given with `--config`, or the first `mockline.yaml`,
-`mockline.yml` or `mockline.json` in the current directory. Invalid config is an
-error. CLI options override config values.
+Mockline reads `--config <file>`, or `mockline.yaml` / `.yml` / `.json` from the
+current folder. CLI options override the file. For editor autocomplete, use
+[`config.schema.json`](config.schema.json).
 
-For editor autocomplete, use [`config.schema.json`](config.schema.json).
+## All settings
 
-## Top-level fields
-
-| Field              | Default     | Meaning                                          |
-| ------------------ | ----------- | ------------------------------------------------ |
-| `port`             | `4010`      | TCP port. `0` picks a free port.                 |
-| `host`             | `127.0.0.1` | Bind address. Other addresses expose the mock.   |
-| `seed`             | `0`         | Seed for generated responses.                    |
-| `prefer`           | `example`   | `example` or `generate`.                         |
-| `latency`          | `0`         | Delay in ms: `25`, `[10, 80]` or `{ min, max }`. |
-| `validate`         | `warn`      | `off`, `warn` or `strict`.                       |
-| `enforceAuth`      | `false`     | Require declared credentials (presence only).    |
-| `requestBodyLimit` | `1048576`   | Max request body in bytes.                       |
-| `requestTimeoutMs` | `30000`     | Request timeout in ms.                           |
-
-`latency` can also be `{ min, max, distribution: normal }` (default `uniform`).
-`--delay 25` or `--delay 10-80` overrides it.
-
-## Errors
+Every setting is optional. Values shown are the defaults.
 
 ```yaml
+port: 4010 # 0 picks a free port
+host: 127.0.0.1 # other addresses expose the mock to your network
+seed: 0 # same seed = same generated data
+prefer: example # or: generate
+validate: warn # off, warn or strict
+latency: 0 # ms: 25, [10, 80] or { min, max, distribution: normal }
+enforceAuth: false # require declared credentials (not verified)
+requestBodyLimit: 1048576 # bytes
+requestTimeoutMs: 30000
+
 errors:
-  rate: 0.05 # 0 to 1
+  rate: 0 # 0 to 1, chance of an injected error
   statuses: [500, 503]
-  perOperationRates:
-    createPet: 0.2
-```
+  perOperationRates: {} # e.g. { createPet: 0.2 }
 
-`X-Mockline-Error: true` forces the first status in `statuses`.
-
-## Stateful
-
-```yaml
 stateful:
-  enabled: true
-  seedItems: 3
-  idProperty: id
-```
+  enabled: false
+  seedItems: 3 # generated items per collection
+  idProperty: id # also tries the path parameter name, uuid and _id
+  seed: ./seed.json # start from these items (not set by default)
+  file: ./state.json # load on start, save after each change (not set by default)
 
-See [stateful mode](how-it-works.md#stateful-mode) for which routes qualify.
-
-## Generation
-
-```yaml
 generation:
-  hints: true # false, or a map of property name → value
+  hints: true # realistic values from property names; or a map of name -> value
   counter: false # true varies output per request
-  maxDepth: 3 # 0–20, limits recursion
+  maxDepth: 3 # recursion limit, 0-20
   minArrayItems: 1
   maxArrayItems: 3
+
+proxy:
+  url: https://api.example.test # not set by default
+  all: false # true forwards every request, not just unmatched ones
+  allowPrivate: false # allow loopback/private upstreams
+  timeoutMs: 5000
+  recordFile: ./proxy-examples.json # save upstream responses (not set by default)
+
+cors:
+  enabled: true
+  origins: ['*']
+
+recording:
+  enabled: true
+  file: ./requests.jsonl # also append requests here (not set by default)
+  maxRequests: 500
+  redactHeaders: [authorization, cookie, set-cookie, x-api-key, api-key, x-auth-token]
+
+controlHeaders:
+  allow: true # false ignores Prefer and X-Mockline-* headers
+
+inspector:
+  enabled: true # default: on for loopback hosts, off otherwise
 ```
 
 ## Overrides
 
-Key overrides by `operationId` or `METHOD /path`.
-
-Fixed response:
+Fix a response by `operationId` or `METHOD /path`:
 
 ```yaml
 overrides:
   listPets:
     status: 200
-    body:
-      - id: 1
-        name: Fixed response
-```
+    body: [{ id: 1, name: Fixed }]
 
-Sequence (stays on the last item unless `loop: true`):
-
-```yaml
-overrides:
-  getPet:
-    loop: true
+  getPet: # returns each in turn, then stays on the last (loop: true repeats)
     sequence:
-      - status: 200
-        body: { id: 1, name: First }
-      - status: 404
-        body: { title: Not Found, status: 404 }
-```
+      - { status: 200, body: { id: 1, name: First } }
+      - { status: 404 }
 
-Rules (first match wins). `location` is `query`, `header` or `body`; `op` is
-`eq` (default), `contains` or `regex`. Body names can be paths like `user.id`.
-
-```yaml
-overrides:
-  listPets:
+  searchPets: # first matching rule wins
     rules:
-      - when: { location: query, name: demo, value: empty }
+      - when: { location: query, name: q, value: empty }
         response: { status: 200, body: [] }
 ```
 
-Overrides can also set `headers` and `delay`.
+`location` is `query`, `header` or `body` (paths like `user.id` work). `op` is
+`eq` (default), `contains` or `regex`. Any override can also set `headers` and
+`delay`.
 
-## Proxy
+## Seed and state files
 
-```yaml
-proxy:
-  url: https://api.example.test/v1
-  all: false # true forwards every request, not just unmatched ones
-  allowPrivate: false # allow loopback/private upstreams
-  timeoutMs: 5000
-  recordFile: ./proxy-examples.json
+`stateful.seed` and `stateful.file` use the same JSON format. Keys are list
+paths (or the list `operationId`):
+
+```json
+{
+  "/pets": [{ "id": 1, "name": "Milo" }],
+  "/users/1/posts": [{ "postId": 1, "title": "Hello" }]
+}
 ```
 
-## CORS
+To go back to the seed data, delete the state file or call reset.
 
-```yaml
-cors:
-  enabled: true
-  origins: ['*']
+## Testing
+
+```ts
+import { beforeAll, afterAll, beforeEach, expect, test } from 'vitest';
+import { useMockline, mocklineMatchers } from '@zahid15/mockline/testing';
+
+expect.extend(mocklineMatchers);
+
+const api = useMockline({
+  spec: './openapi.yaml',
+  hooks: { beforeAll, afterAll, beforeEach }, // not needed with Jest or Vitest globals
+});
+
+test('creates a pet', async () => {
+  await fetch(`${api.url}/pets`, { method: 'POST', body: '{}' });
+  expect(api).toHaveReceived('POST /pets', 1);
+});
 ```
 
-On by default. Disable with `--no-cors` or `enabled: false`.
+The server starts before the tests and stops after. Data and recorded requests
+reset before each test. Match requests by `"METHOD /path"`, `"/path"` or
+`operationId`.
 
-## Recording
+For `toHaveReceived` types in Vitest, add once:
 
-```yaml
-recording:
-  enabled: true
-  file: ./mockline-records.jsonl
-  maxRequests: 500
-  redactHeaders: [x-internal-token]
+```ts
+import type { MocklineMatchers } from '@zahid15/mockline/testing';
+
+declare module 'vitest' {
+  interface Assertion<T> extends MocklineMatchers<T> {}
+}
 ```
-
-Common credential headers are always redacted; `redactHeaders` adds more.
-Request bodies are not redacted.
-
-## Control headers
-
-```yaml
-controlHeaders:
-  allow: true
-```
-
-Set to `false` when clients must not change mock behavior with `Prefer` or
-`X-Mockline-*` headers.
-
-## Inspector
-
-```yaml
-inspector:
-  enabled: false
-```
-
-On by default for loopback hosts, off otherwise. It has no authentication.
-
-## Example
-
-See [`examples/petstore/mockline.yaml`](../examples/petstore/mockline.yaml).

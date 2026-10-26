@@ -13,6 +13,7 @@ import { selectResponse } from './select.js';
 import { RequestRecorder } from './record.js';
 import { handleInspector } from './inspector.js';
 import { ResourceStore } from './state/store.js';
+import { readStateFile, StateFileWriter } from './state/file.js';
 import { forwardRequest, ProxyExampleRecorder } from './proxy.js';
 import {
   checkSecurityPresence,
@@ -57,6 +58,7 @@ export interface CreateMockServerOptions {
   config?: DeepPartial<MocklineConfig>;
   inspector?: boolean;
   logger?: Logger;
+  logRequests?: boolean;
   clock?: () => Date;
   fetch?: typeof globalThis.fetch;
   watch?: boolean;
@@ -297,10 +299,30 @@ export async function createMockServer(options: CreateMockServerOptions): Promis
   if (['0.0.0.0', '::'].includes(config.host))
     logger.warn(`Binding to ${config.host} exposes this mock server to the network.`);
 
+  const stateWriter = new StateFileWriter();
+  const buildStore = async (
+    router: Router,
+    spec: LoadedSpec,
+    storeConfig: MocklineConfig,
+  ): Promise<ResourceStore> => {
+    const { enabled, seed, file } = storeConfig.stateful;
+    await stateWriter.flush();
+    const seedData = enabled && seed ? await readStateFile(seed) : undefined;
+    const initialData = enabled && file ? await readStateFile(file, true) : undefined;
+    const store = new ResourceStore(router, spec.document, storeConfig, {
+      seedData,
+      initialData,
+      onChange: (data) => stateWriter.save(data),
+    });
+    for (const warning of store.warnings) logger.warn(warning);
+    stateWriter.setFile(enabled ? file : undefined);
+    return store;
+  };
+
   const routerState: { current: Router } = { current: createRouter(loaded.document) };
   const specState: { current: LoadedSpec } = { current: loaded };
   const stateStoreState = {
-    current: new ResourceStore(routerState.current, loaded.document, config),
+    current: await buildStore(routerState.current, loaded, config),
   };
   const recorder = new RequestRecorder(config, options.clock);
   const proxyExamples = new ProxyExampleRecorder(config.proxy.recordFile);
@@ -579,6 +601,10 @@ export async function createMockServer(options: CreateMockServerOptions): Promis
       }
     } finally {
       const ended = (options.clock ?? (() => new Date()))().getTime();
+      if (options.logRequests && source !== 'inspector')
+        logger.info(
+          `${method} ${url.pathname}${url.search} -> ${res.statusCode || response.status} (${source}, ${Math.max(0, ended - started)}ms)`,
+        );
       if (config.recording.enabled) {
         recorder.record({
           method,
@@ -652,7 +678,7 @@ export async function createMockServer(options: CreateMockServerOptions): Promis
       try {
         const nextSpec = await loadSpec(options.spec);
         const nextRouter = createRouter(nextSpec.document);
-        const nextStore = new ResourceStore(nextRouter, nextSpec.document, config);
+        const nextStore = await buildStore(nextRouter, nextSpec, config);
         specState.current = nextSpec;
         routerState.current = nextRouter;
         stateStoreState.current = nextStore;
@@ -684,11 +710,14 @@ export async function createMockServer(options: CreateMockServerOptions): Promis
           config.seed !== nextConfig.seed ||
           JSON.stringify(config.stateful) !== JSON.stringify(nextConfig.stateful) ||
           JSON.stringify(config.generation) !== JSON.stringify(nextConfig.generation);
+        const nextStore = stateChanged
+          ? await buildStore(routerState.current, specState.current, nextConfig)
+          : undefined;
         config = nextConfig;
         recorder.setConfig(config);
         proxyExamples.setFile(config.proxy.recordFile);
-        stateStoreState.current.setConfig(config);
-        if (stateChanged) stateStoreState.current.reset();
+        if (nextStore) stateStoreState.current = nextStore;
+        else stateStoreState.current.setConfig(config);
         setServerRequestTimeout(httpServer, config.requestTimeoutMs);
         logger.info('Reloaded Mockline configuration');
       } catch (error) {
@@ -747,6 +776,7 @@ export async function createMockServer(options: CreateMockServerOptions): Promis
       });
       await recorder.flush();
       await proxyExamples.flush();
+      await stateWriter.flush();
     },
   };
 }

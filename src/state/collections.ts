@@ -13,6 +13,8 @@ export interface ResourceCollection {
   path: string;
   idParam: string;
   idProperty: string;
+  parentParams: string[];
+  properties: string[];
   listRoute: MatchedRoute;
   createRoute: MatchedRoute;
   itemRoutes: Map<string, MatchedRoute>;
@@ -113,6 +115,18 @@ function declaredQueryName(route: MatchedRoute, name: string): string | undefine
     : undefined;
 }
 
+export function parentParams(path: string): string[] {
+  return [...path.matchAll(/\{([^{}]+)\}/g)].map((match) => match[1] ?? '');
+}
+
+function idPropertyFor(
+  properties: Record<string, JsonSchema>,
+  preferred: string,
+  idParam: string,
+): string | undefined {
+  return [preferred, idParam, 'id', 'uuid', '_id'].find((name) => isRecord(properties[name]));
+}
+
 export function detectCollections(
   router: Router,
   root: OpenApiDocument,
@@ -120,7 +134,7 @@ export function detectCollections(
 ): ResourceCollection[] {
   const collections: ResourceCollection[] = [];
   const listRoutes = router.routes.filter(
-    (route) => route.method === 'GET' && !route.path.includes('{'),
+    (route) => route.method === 'GET' && !route.path.endsWith('}'),
   );
   for (const listRoute of listRoutes) {
     const createRoute = router.routes.find(
@@ -137,21 +151,21 @@ export function detectCollections(
     const getSchema = responseSchema(getItem.operation);
     if (!getSchema || schemaFingerprint(listItem, root) !== schemaFingerprint(getSchema, root))
       continue;
+    const idParam = pathId(getItem.path, listRoute.path) ?? idProperty;
     const properties = schemaProperties(listItem, root);
-    const idSchema = isRecord(properties[idProperty])
-      ? (properties[idProperty] as JsonSchema)
-      : undefined;
-    if (!idSchema) continue;
+    const resolvedIdProperty = idPropertyFor(properties, idProperty, idParam);
+    if (!resolvedIdProperty) continue;
     const itemRoutes = new Map<string, MatchedRoute>();
     for (const route of itemCandidates) {
       const routeIdParam = pathId(route.path, listRoute.path);
-      if (routeIdParam && routeIdParam === pathId(getItem.path, listRoute.path))
-        itemRoutes.set(route.method, route);
+      if (routeIdParam && routeIdParam === idParam) itemRoutes.set(route.method, route);
     }
     collections.push({
       path: listRoute.path,
-      idParam: pathId(getItem.path, listRoute.path) ?? idProperty,
-      idProperty,
+      idParam,
+      idProperty: resolvedIdProperty,
+      parentParams: parentParams(listRoute.path),
+      properties: Object.keys(properties),
       listRoute,
       createRoute,
       itemRoutes,

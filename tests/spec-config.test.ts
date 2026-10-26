@@ -34,12 +34,21 @@ describe('spec loading and summaries', () => {
     );
   });
 
-  it('provides a clear Swagger 2.0 conversion limitation', async () => {
-    await expect(loadSpec(fixture('swagger2.yaml'))).rejects.toMatchObject({
-      name: 'MocklineError',
-      message: expect.stringContaining('Convert the document to OpenAPI 3.x'),
-      exitCode: 1,
-    });
+  it('converts Swagger 2.0 documents to OpenAPI 3', async () => {
+    const loaded = await loadSpec(fixture('swagger2.yaml'));
+    expect(loaded.document.openapi).toMatch(/^3\./);
+    expect(loaded.warnings[0]?.message).toContain('Converted from Swagger 2.0');
+    expect(summarizeSpec(loaded)).toContainEqual(
+      expect.objectContaining({ method: 'GET', path: '/api/pets', operationId: 'listPets' }),
+    );
+  });
+
+  it('rejects unknown Swagger versions', async () => {
+    const directory = await mkdtemp(join(tmpdir(), 'mockline-spec-'));
+    temporaryDirectories.push(directory);
+    const file = join(directory, 'swagger1.yaml');
+    await writeFile(file, "swagger: '1.2'\ninfo: { title: Old, version: 1 }\npaths: {}\n");
+    await expect(loadSpec(file)).rejects.toThrow(/Only Swagger 2.0 and OpenAPI 3.x/);
   });
 
   it('reports unresolved references and invalid YAML as spec errors', async () => {

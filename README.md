@@ -7,14 +7,14 @@ tests and demos.
 
 ## Features
 
-- OpenAPI 3.0 and 3.1, YAML or JSON
+- OpenAPI 3.0, 3.1 and Swagger 2.0, YAML or JSON
 - Responses from spec examples, or realistic data generated from schemas
 - Request validation
-- In-memory CRUD (create, read, update, delete)
+- CRUD (create, read, update, delete) with data saved to a file if you want
 - Custom responses, delays and errors
 - Proxy to a real API
 - Reloads when files change
-- Usable as a CLI or a TypeScript library
+- Usable as a CLI, a TypeScript library, or in Vitest/Jest tests
 
 ## Install
 
@@ -28,16 +28,17 @@ npm install --global @zahid15/mockline
 
 ```sh
 mockline init                  # create openapi.yaml and mockline.yaml
-mockline serve openapi.yaml    # start at http://127.0.0.1:4010
+mockline serve                 # start at http://127.0.0.1:4010
 ```
 
-Then open `http://127.0.0.1:4010/pets`.
+Then open `http://127.0.0.1:4010/pets`. Without a file name, Mockline uses
+`openapi.yaml` (or `.yml`/`.json`) from the current folder.
 
 Other commands:
 
 ```sh
-mockline routes openapi.yaml   # list routes
-mockline validate openapi.yaml # check the spec
+mockline routes                # list routes
+mockline validate              # check the spec
 mockline --help                # all options
 ```
 
@@ -48,6 +49,7 @@ mockline --help                # all options
 | `--port <port>`                  | Port (default `4010`)                 |
 | `--config <file>`                | Config file (default `mockline.yaml`) |
 | `--stateful`                     | Keep created data in memory           |
+| `--state-file <file>`            | Also save that data to a JSON file    |
 | `--validate <off\|warn\|strict>` | Request validation (default `warn`)   |
 | `--delay <ms>`                   | Add a delay to each response          |
 | `--proxy <url>`                  | Send unknown routes to a real API     |
@@ -70,6 +72,21 @@ const server = await createMockServer({ spec: './openapi.yaml', port: 0 });
 await fetch(`${server.url}/pets`);
 await server.close();
 ```
+
+## Use in tests
+
+```ts
+import { useMockline } from '@zahid15/mockline/testing';
+
+const api = useMockline({ spec: './openapi.yaml' }); // starts before, stops after
+
+test('creates a pet', async () => {
+  await fetch(`${api.url}/pets`, { method: 'POST', body: '{}' });
+  expect(api.received('POST /pets')).toHaveLength(1);
+});
+```
+
+See [testing](docs/configuration.md#testing) for Vitest setup and matchers.
 
 ## Docker
 

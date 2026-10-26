@@ -1,0 +1,95 @@
+openapi: 3.0.3
+info:
+  title: Nested collections
+  version: 1.0.0
+paths:
+  /users:
+    get:
+      operationId: listUsers
+      responses:
+        '200':
+          description: Users
+          content:
+            application/json:
+              schema: { type: array, items: { $ref: '#/components/schemas/User' } }
+    post:
+      operationId: createUser
+      requestBody:
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/User' }
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/User' }
+  /users/{uuid}:
+    parameters:
+      - { name: uuid, in: path, required: true, schema: { type: string } }
+    get:
+      operationId: getUser
+      responses:
+        '200':
+          description: User
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/User' }
+  /users/{userId}/posts:
+    parameters:
+      - { name: userId, in: path, required: true, schema: { type: string } }
+    get:
+      operationId: listPosts
+      parameters:
+        - { name: status, in: query, schema: { type: string } }
+      responses:
+        '200':
+          description: Posts
+          content:
+            application/json:
+              schema: { type: array, items: { $ref: '#/components/schemas/Post' } }
+    post:
+      operationId: createPost
+      requestBody:
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/Post' }
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Post' }
+  /users/{userId}/posts/{postId}:
+    parameters:
+      - { name: userId, in: path, required: true, schema: { type: string } }
+      - { name: postId, in: path, required: true, schema: { type: integer } }
+    get:
+      operationId: getPost
+      responses:
+        '200':
+          description: Post
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Post' }
+    delete:
+      operationId: deletePost
+      responses:
+        '204':
+          description: Deleted
+components:
+  schemas:
+    User:
+      type: object
+      required: [uuid, name]
+      properties:
+        uuid: { type: string, format: uuid }
+        name: { type: string }
+    Post:
+      type: object
+      required: [postId, title, status]
+      properties:
+        postId: { type: integer, minimum: 1 }
+        userId: { type: string }
+        title: { type: string }
+        status: { type: string, enum: [draft, published] }

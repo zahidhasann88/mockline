@@ -162,6 +162,8 @@ interface CliOptions extends Record<string, unknown> {
   errorStatuses?: string;
   validate?: string;
   stateful?: boolean;
+  stateFile?: string;
+  seedData?: string;
   proxy?: string;
   proxyAll?: boolean;
   proxyRecord?: string;
@@ -252,7 +254,9 @@ function makeConfig(base: MocklineConfig, options: CliOptions): MocklineConfig {
       },
       stateful: {
         ...base.stateful,
-        ...(options.stateful ? { enabled: true } : {}),
+        ...(options.stateful || options.stateFile || options.seedData ? { enabled: true } : {}),
+        ...(options.stateFile ? { file: options.stateFile } : {}),
+        ...(options.seedData ? { seed: options.seedData } : {}),
       },
       proxy: {
         ...base.proxy,
@@ -309,6 +313,26 @@ function table(spec: Awaited<ReturnType<typeof loadSpec>>, configKeys: string[] 
   ].join('\n');
 }
 
+const DEFAULT_SPECS = [
+  'openapi.yaml',
+  'openapi.yml',
+  'openapi.json',
+  'swagger.yaml',
+  'swagger.yml',
+  'swagger.json',
+];
+
+function specOrDefault(spec: unknown): string {
+  if (typeof spec === 'string' && spec.length > 0) return spec;
+  const found = DEFAULT_SPECS.find((name) => existsSync(resolve(name)));
+  if (!found)
+    throw new MocklineError(
+      `No spec file given and none found in this folder (looked for ${DEFAULT_SPECS.join(', ')}).`,
+      2,
+    );
+  return found;
+}
+
 async function initProject(
   options: CliOptions,
   logger: ReturnType<typeof createLogger>,
@@ -339,6 +363,7 @@ async function startServing(specPath: string, options: CliOptions): Promise<void
     config,
     inspector: options.inspector,
     logger,
+    logRequests: options.quiet !== true,
     watch: options.watch === true,
     configFile: loadedConfig.path ?? options.config,
     reloadConfig: async () => {
@@ -399,7 +424,7 @@ export async function runCli(argv = process.argv.slice(2)): Promise<number> {
     );
 
   cli
-    .command('serve <spec>', 'Start a mock API server')
+    .command('serve [spec]', 'Start a mock API server (default: ./openapi.yaml)')
     .option('--port <port>', 'Port to listen on; use 0 to select a free port')
     .option('--host <host>', 'Bind address (default 127.0.0.1)')
     .option('--config <file>', 'YAML or JSON config file')
@@ -410,6 +435,8 @@ export async function runCli(argv = process.argv.slice(2)): Promise<number> {
     .option('--error-statuses <codes>', 'Failure statuses, comma-separated')
     .option('--validate <mode>', 'Request validation: off, warn, or strict')
     .option('--stateful', 'Enable in-memory resource collections')
+    .option('--state-file <file>', 'Load and save stateful data in a JSON file')
+    .option('--seed-data <file>', 'Start stateful collections from a JSON file')
     .option('--proxy <url>', 'Forward unmatched requests to an upstream')
     .option('--proxy-all', 'Forward all non-inspector requests to the upstream')
     .option('--proxy-record <file>', 'Save upstream responses as JSON examples')
@@ -426,25 +453,24 @@ export async function runCli(argv = process.argv.slice(2)): Promise<number> {
     .option('--no-color', 'Disable color output')
     .action(
       register(async (spec: unknown, optionsUnknown: unknown) => {
-        const specPath = String(spec);
         const options = (optionsUnknown ?? {}) as CliOptions;
-        await startServing(specPath, options);
+        await startServing(specOrDefault(spec), options);
       }),
     );
 
-  cli.command('routes <spec>', 'List operations and their default response source').action(
+  cli.command('routes [spec]', 'List operations and their default response source').action(
     register(async (spec: unknown) => {
-      const loaded = await loadSpec(String(spec));
+      const loaded = await loadSpec(specOrDefault(spec));
       const config = await loadConfig();
       console.log(table(loaded, Object.keys(config.config.overrides)));
     }),
   );
 
   cli
-    .command('validate <spec>', 'Validate an OpenAPI document and report mocking limitations')
+    .command('validate [spec]', 'Validate an OpenAPI document and report mocking limitations')
     .action(
       register(async (spec: unknown) => {
-        const loaded = await loadSpec(String(spec));
+        const loaded = await loadSpec(specOrDefault(spec));
         const operationCount = summarizeSpec(loaded).length;
         const version = loaded.document.openapi ?? 'OpenAPI';
         console.log(
