@@ -12,6 +12,4 @@ coverage/
 mockline-records.jsonl
 .env*
 
-# Demo output
-demo-output/
 .env.*

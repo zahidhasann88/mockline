@@ -9,5 +9,3 @@ coverage
 .npm
 *.log
 .env*
-
-demo-output

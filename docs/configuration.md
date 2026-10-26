@@ -4,8 +4,7 @@ Mockline loads the file given with `--config`, or the first `mockline.yaml`,
 `mockline.yml` or `mockline.json` in the current directory. Invalid config is an
 error. CLI options override config values.
 
-Editor schema: [`config.schema.json`](config.schema.json). Regenerate it with
-`corepack pnpm schema:config` after changing `src/config/schema.ts`.
+For editor autocomplete, use [`config.schema.json`](config.schema.json).
 
 ## Top-level fields
 

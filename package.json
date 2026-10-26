@@ -29,8 +29,7 @@
     "examples",
     "README.md",
     "LICENSE",
-    "CHANGELOG.md",
-    "SECURITY.md"
+    "CHANGELOG.md"
   ],
   "repository": {
     "type": "git",
@@ -64,9 +63,7 @@
     "schema:config": "tsx scripts/generate-config-schema.ts",
     "publint": "publint",
     "attw": "attw --pack --profile esm-only",
-    "benchmark": "tsx scripts/benchmark.ts",
-    "pack:check": "tsup && node scripts/verify-pack.mjs",
-    "demo": "pnpm build && node scripts/demo.mjs"
+    "pack:check": "tsup && node scripts/verify-pack.mjs"
   },
   "dependencies": {
     "@apidevtools/swagger-parser": "^12.1.0",
@@ -94,5 +91,5 @@
     "vitest": "^3.1.4",
     "zod-to-json-schema": "^3.24.5"
   },
-  "author": "Zahid Hasan <jahidhasann67@gmail.com>"
+  "author": "Zahid Hasan"
 }

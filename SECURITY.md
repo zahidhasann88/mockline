@@ -1,28 +1,12 @@
-# Security policy
+# Security
 
-Mockline is intended for local development, tests, and demos—not as a
-production API server or authorization system.
+Mockline is for local development and tests. It is not a production server.
 
-## Safe use
+- It binds to `127.0.0.1` by default. Keep it that way unless you need network access.
+- The inspector has no authentication.
+- `--enforce-auth` only checks that credentials are present. It does not verify them.
+- Request bodies and proxy recordings are not redacted.
 
-- Keep the bind address at the loopback default (`127.0.0.1`) unless you
-  deliberately need network access.
-- The inspector has no authentication. It is disabled on non-loopback binds by
-  default; do not opt it in on a public or untrusted interface.
-- `--enforce-auth` only checks that a credential declared in the OpenAPI
-  security scheme is present. It never verifies tokens, keys, scopes, or
-  permissions.
-- Proxying blocks local/private destinations by default, but that check is a
-  best-effort SSRF guard and does not replace network egress controls. DNS
-  rebinding is not pinned away. Only configure trusted upstreams, and opt into
-  private destinations only when necessary.
-- Request-record headers are redacted by default, but request bodies and proxy
-  response examples are not automatically redacted. Protect generated files and
-  avoid recording sensitive payloads.
-
-## Reporting a vulnerability
-
-Report security issues to jahidhasann67@gmail.com or through GitHub Security
-Advisories for this repository. Include affected versions, impact, and
-reproduction steps; do not include live credentials or personal data. Please do
-not open a public issue for an unpatched vulnerability.
+To report a vulnerability, use
+[GitHub Security Advisories](https://github.com/zahidhasann88/mockline/security/advisories/new).
+Please don't open a public issue.

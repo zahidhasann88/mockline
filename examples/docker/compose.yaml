@@ -1,7 +1,0 @@
-services:
-  mockline:
-    build: ../..
-    ports: ['127.0.0.1:4010:4010']
-    volumes:
-      - ../petstore:/spec:ro
-    command: ['serve', '/spec/openapi.yaml', '--host', '0.0.0.0', '--port', '4010', '--inspector']

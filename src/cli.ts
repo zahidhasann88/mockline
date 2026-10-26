@@ -293,7 +293,7 @@ function table(spec: Awaited<ReturnType<typeof loadSpec>>, configKeys: string[] 
   const widths = [
     Math.max(6, ...rows.map((row) => row.method.length)),
     Math.max(4, ...rows.map((row) => row.path.length)),
-    Math.max(11, ...rows.map((row) => row.operationId.length)),
+    Math.max(12, ...rows.map((row) => row.operationId.length)),
     Math.max(6, ...rows.map((row) => row.defaultStatus.length)),
     Math.max(6, ...rows.map((row) => row.source.length)),
   ];
