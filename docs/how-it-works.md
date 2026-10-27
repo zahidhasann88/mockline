@@ -62,6 +62,19 @@ Auth checks run when `enforceAuth` is on or any `auth` value is set.
   `scp` or `scopes`.
 - A missing or wrong credential returns `401`. A missing scope returns `403`.
 
+## Recording
+
+`mockline record <url>` forwards every request to the real API and saves each
+response as an example in a copy of your spec.
+
+- Only paths in the spec are recorded. Others are logged and skipped.
+- The newest recording comes first, so it is what `serve` returns. Older ones
+  stay available with `Prefer: example=recorded-2`.
+- Identical responses are skipped, with at most 10 per response.
+- Comments and `$ref`s in the spec are kept. Responses defined with `$ref` are
+  not changed.
+- An existing single `example` is moved to `examples.original`.
+
 ## Validation
 
 - `off`: no checks.

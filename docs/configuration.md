@@ -35,6 +35,7 @@ stateful:
 generation:
   hints: true # realistic values from property names; or a map of name -> value
   counter: false # true varies output per request
+  locale: en # language for names and addresses, e.g. de, fr, ja, pt_BR
   maxDepth: 3 # recursion limit, 0-20
   minArrayItems: 1
   maxArrayItems: 3
@@ -45,6 +46,7 @@ proxy:
   allowPrivate: false # allow loopback/private upstreams
   timeoutMs: 5000
   recordFile: ./proxy-examples.json # save upstream responses (not set by default)
+  recordSpec: ./openapi.recorded.yaml # save them as spec examples (not set by default)
 
 cors:
   enabled: true

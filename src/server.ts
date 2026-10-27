@@ -13,6 +13,7 @@ import {
 import { MocklineError, problem } from './errors.js';
 import { createLogger, type Logger } from './logger.js';
 import { loadSpec, type LoadedSpec } from './spec/load.js';
+import { SpecExampleWriter } from './spec/examples.js';
 import { createRouter, normalizePath, type Router } from './router.js';
 import { selectResponse } from './select.js';
 import { RequestRecorder } from './record.js';
@@ -364,6 +365,9 @@ export async function createMockServer(options: CreateMockServerOptions): Promis
   };
   const recorder = new RequestRecorder(config, options.clock);
   const proxyExamples = new ProxyExampleRecorder(config.proxy.recordFile);
+  const specExamples = config.proxy.recordSpec
+    ? await SpecExampleWriter.open(options.spec, config.proxy.recordSpec)
+    : undefined;
   const requestCounters = new Map<string, number>();
   const sequenceIndexes = new Map<string, number>();
   const startedAt = options.clock?.() ?? new Date();
@@ -505,6 +509,23 @@ export async function createMockServer(options: CreateMockServerOptions): Promis
         config: config.proxy,
         fetchImpl: options.fetch,
       });
+      if (!proxied.blocked && specExamples) {
+        const label = `${method} ${url.pathname}${url.search}`;
+        if (!matchedRoute) logger.warn(`not recorded: ${label} is not in the spec`);
+        else {
+          const result = specExamples.add({
+            specPath: matchedRoute.specPath,
+            method,
+            status: proxied.status,
+            contentType: proxied.headers['content-type'],
+            body: proxied.body,
+            label,
+          });
+          if (result.recorded)
+            logger.info(`recorded ${label} -> ${proxied.status} as ${result.name}`);
+          else logger.debug(`not recorded: ${label} (${result.reason})`);
+        }
+      }
       if (!proxied.blocked && config.proxy.recordFile) {
         proxyExamples.record({
           method,
@@ -564,7 +585,7 @@ export async function createMockServer(options: CreateMockServerOptions): Promis
         bodyPresent = read.present;
         rawBody = read.raw;
         if (config.proxy.all && config.proxy.url) {
-          response = await forward();
+          response = await forward(routerState.current.match(method, pathname)?.route);
           source = 'proxy';
         } else {
           const match = routerState.current.match(method, pathname);
@@ -936,6 +957,7 @@ export async function createMockServer(options: CreateMockServerOptions): Promis
       });
       await recorder.flush();
       await proxyExamples.flush();
+      await specExamples?.flush();
       await events.close();
       await stateWriter.flush();
     },

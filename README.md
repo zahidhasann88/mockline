@@ -20,7 +20,8 @@ tests and demos.
 - Response templates that use request values, like `{{request.body.name}}`
 - Callbacks and webhooks from your spec
 - Auth checks: API keys, basic, bearer tokens and JWT scopes
-- Proxy to a real API
+- Proxy to a real API, or record its responses into your spec
+- Fake data in many languages (`--locale de`)
 - Reloads when files change
 - Usable as a CLI, a TypeScript library, or in Vitest/Jest tests
 
@@ -63,6 +64,17 @@ mockline --help                # all options
 | `--proxy <url>`                  | Send unknown routes to a real API     |
 | `--webhook-url <url>`            | Where to send webhooks                |
 | `--watch`                        | Reload when files change              |
+
+## Record a real API
+
+```sh
+mockline record https://api.example.com   # proxy and save responses
+mockline serve openapi.recorded.yaml        # replay them, no API needed
+```
+
+Point your app at `http://127.0.0.1:4010` while recording. Responses are added
+as examples to a copy of your spec. Add `--allow-private` for an API on
+`localhost`.
 
 ## Control a single request
 

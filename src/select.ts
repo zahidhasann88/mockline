@@ -389,6 +389,7 @@ function responseWithStatusAndMedia(
     seed,
     root: input.root,
     hints: input.config.generation.hints,
+    locale: input.config.generation.locale,
     maxDepth: input.config.generation.maxDepth,
     minArrayItems: input.config.generation.minArrayItems,
     maxArrayItems: input.config.generation.maxArrayItems,

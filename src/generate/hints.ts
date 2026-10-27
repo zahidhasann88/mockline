@@ -1,11 +1,18 @@
-import { Faker, en } from '@faker-js/faker';
+import { Faker, allLocales, en, type LocaleDefinition } from '@faker-js/faker';
 import type { SeededRandom } from './rng.js';
 
 export type HintValue = string | number | boolean | null;
 export type GenerationHints = Record<string, HintValue | readonly HintValue[]>;
 
-export function createFaker(seed: number): Faker {
-  const faker = new Faker({ locale: [en] });
+export const LOCALES = Object.keys(allLocales).filter((name) => name !== 'base');
+
+export function isLocale(name: string): boolean {
+  return LOCALES.includes(name);
+}
+
+export function createFaker(seed: number, locale = 'en'): Faker {
+  const selected = (allLocales as Record<string, LocaleDefinition>)[locale];
+  const faker = new Faker({ locale: selected && locale !== 'en' ? [selected, en] : [en] });
   faker.seed(seed);
   faker.setDefaultRefDate('2020-01-01T00:00:00.000Z');
   return faker;

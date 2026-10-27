@@ -1,5 +1,14 @@
 # Changelog
 
+## [Unreleased]
+
+### Added
+
+- `mockline record <url>`: proxy a real API and save its responses as examples
+  in a copy of your spec (`proxy.recordSpec`), then replay them with `serve`.
+- `generation.locale` and `--locale`: fake names and addresses in other
+  languages, such as `de`, `fr`, `ja` or `pt_BR`.
+
 ## [0.4.0] - 2026-10-27
 
 ### Added

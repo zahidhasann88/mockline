@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { isLocale } from '../generate/hints.js';
 
 const nonNegative = z.number().finite().min(0);
 const httpUrl = z
@@ -96,6 +97,7 @@ export const configSchema = z.object({
       allowPrivate: z.boolean().default(false),
       timeoutMs: z.number().int().positive().default(5000),
       recordFile: z.string().optional(),
+      recordSpec: z.string().min(1).optional(),
     })
     .refine((value) => !value.all || Boolean(value.url), {
       message: 'proxy.url is required when proxy.all is true',
@@ -135,6 +137,10 @@ export const configSchema = z.object({
         ])
         .default(true),
       counter: z.boolean().default(false),
+      locale: z
+        .string()
+        .refine(isLocale, { message: 'must be a faker locale such as en, de, fr, ja or pt_BR' })
+        .default('en'),
       maxDepth: z.number().int().min(0).max(20).default(3),
       minArrayItems: z.number().int().min(0).default(1),
       maxArrayItems: z.number().int().min(0).default(3),

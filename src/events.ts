@@ -141,6 +141,7 @@ export function eventPayload(
     root,
     seed,
     hints: config.generation.hints,
+    locale: config.generation.locale,
     maxDepth: config.generation.maxDepth,
     minArrayItems: config.generation.minArrayItems,
     maxArrayItems: config.generation.maxArrayItems,

@@ -12,6 +12,7 @@ export interface GenerationOptions {
   maxArrayItems?: number;
   hints?: boolean | GenerationHints;
   mode?: 'response' | 'request';
+  locale?: string;
 }
 
 export interface GeneratorWarning {
@@ -558,7 +559,7 @@ function createContext(options: GenerationOptions, seed: number): Context {
   return {
     root: options.root ?? {},
     rng: new SeededRandom(seed),
-    faker: createFaker(seed),
+    faker: createFaker(seed, options.locale),
     maxDepth: options.maxDepth ?? 3,
     minArrayItems: options.minArrayItems ?? 1,
     maxArrayItems: options.maxArrayItems ?? 3,

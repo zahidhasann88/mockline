@@ -76,6 +76,7 @@ export interface MatchedRoute {
   method: string;
   path: string;
   routePath: string;
+  specPath: string;
   operationId: string;
   operation: ApiOperation;
   pathItem: ApiPathItem;

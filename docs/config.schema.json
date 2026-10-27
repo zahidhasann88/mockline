@@ -352,6 +352,10 @@
             },
             "recordFile": {
               "type": "string"
+            },
+            "recordSpec": {
+              "type": "string",
+              "minLength": 1
             }
           },
           "additionalProperties": false,
@@ -454,6 +458,10 @@
             "counter": {
               "type": "boolean",
               "default": false
+            },
+            "locale": {
+              "type": "string",
+              "default": "en"
             },
             "maxDepth": {
               "type": "integer",

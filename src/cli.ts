@@ -166,6 +166,10 @@ interface CliOptions extends Record<string, unknown> {
   seedData?: string;
   webhookUrl?: string;
   callbacks?: boolean;
+  spec?: string;
+  out?: string;
+  allowPrivate?: boolean;
+  recordSpec?: string;
   proxy?: string;
   proxyAll?: boolean;
   proxyRecord?: string;
@@ -176,6 +180,7 @@ interface CliOptions extends Record<string, unknown> {
   recordFile?: string;
   enforceAuth?: boolean;
   seedCounter?: boolean;
+  locale?: string;
   quiet?: boolean;
   verbose?: boolean;
   color?: boolean;
@@ -266,6 +271,7 @@ function makeConfig(base: MocklineConfig, options: CliOptions): MocklineConfig {
         ...(options.proxyAll ? { all: true } : {}),
         ...(options.proxyAllowPrivate ? { allowPrivate: true } : {}),
         ...(options.proxyRecord ? { recordFile: options.proxyRecord } : {}),
+        ...(options.recordSpec ? { recordSpec: options.recordSpec } : {}),
       },
       events: {
         ...base.events,
@@ -288,6 +294,7 @@ function makeConfig(base: MocklineConfig, options: CliOptions): MocklineConfig {
       generation: {
         ...base.generation,
         ...(options.seedCounter ? { counter: true } : {}),
+        ...(options.locale ? { locale: options.locale } : {}),
       },
     });
   } catch (error) {
@@ -340,6 +347,11 @@ function specOrDefault(spec: unknown): string {
   return found;
 }
 
+function recordedPath(specPath: string): string {
+  const match = /^(.*?)(\.[^./\\]+)?$/.exec(specPath);
+  return `${match?.[1] ?? specPath}.recorded${match?.[2] ?? '.yaml'}`;
+}
+
 async function initProject(
   options: CliOptions,
   logger: ReturnType<typeof createLogger>,
@@ -379,6 +391,10 @@ async function startServing(specPath: string, options: CliOptions): Promise<void
     },
   });
   logger.info(`Mock API listening at ${server.url}`);
+  if (config.proxy.recordSpec)
+    logger.info(
+      `Recording responses from ${config.proxy.url} into ${config.proxy.recordSpec}. Press Ctrl+C to stop.`,
+    );
   if (
     options.quiet !== true &&
     (config.inspector.enabled ?? ['127.0.0.1', 'localhost', '::1'].includes(config.host))
@@ -457,6 +473,7 @@ export async function runCli(argv = process.argv.slice(2)): Promise<number> {
     .option('--record-file <path>', 'Append redacted request records as JSONL')
     .option('--enforce-auth', 'Require declared security credentials to be present')
     .option('--seed-counter', 'Vary repeat requests with an operation-local counter')
+    .option('--locale <locale>', 'Language for generated names and addresses, e.g. de or fr')
     .option('--quiet', 'Suppress normal logs')
     .option('--verbose', 'Enable diagnostic logs')
     .option('--no-color', 'Disable color output')
@@ -464,6 +481,31 @@ export async function runCli(argv = process.argv.slice(2)): Promise<number> {
       register(async (spec: unknown, optionsUnknown: unknown) => {
         const options = (optionsUnknown ?? {}) as CliOptions;
         await startServing(specOrDefault(spec), options);
+      }),
+    );
+
+  cli
+    .command('record <url>', 'Proxy a real API and save its responses as spec examples')
+    .option('--spec <file>', 'OpenAPI spec to add examples to (default: ./openapi.yaml)')
+    .option('--out <file>', 'Where to write the spec with examples (default: <spec>.recorded.yaml)')
+    .option('--port <port>', 'Port to listen on')
+    .option('--host <host>', 'Bind address (default 127.0.0.1)')
+    .option('--config <file>', 'YAML or JSON config file')
+    .option('--allow-private', 'Allow a localhost or private network API')
+    .option('--quiet', 'Suppress normal logs')
+    .option('--verbose', 'Also log responses that were not recorded')
+    .option('--no-color', 'Disable color output')
+    .action(
+      register(async (upstream: unknown, optionsUnknown: unknown) => {
+        const options = (optionsUnknown ?? {}) as CliOptions;
+        const specPath = specOrDefault(options.spec);
+        await startServing(specPath, {
+          ...options,
+          proxy: String(upstream),
+          proxyAll: true,
+          proxyAllowPrivate: options.allowPrivate === true,
+          recordSpec: options.out ?? recordedPath(specPath),
+        });
       }),
     );
 
