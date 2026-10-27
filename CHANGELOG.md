@@ -1,5 +1,12 @@
 # Changelog
 
+## [Unreleased]
+
+### Added
+
+- Response templates: override bodies and headers can use request values, e.g.
+  `{{request.path.petId}}`, `{{request.body.name}}`, `{{now}}` and `{{uuid}}`.
+
 ## [0.3.0] - 2026-10-27
 
 ### Added

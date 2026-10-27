@@ -678,6 +678,8 @@ export async function createMockServer(options: CreateMockServerOptions): Promis
                   requestCounter: counter,
                   sequenceIndexes,
                   stateResponse,
+                  params: match.params,
+                  now: (options.clock ?? (() => new Date()))(),
                 });
                 response = selected.response;
                 if (selected.sequenceKey) {

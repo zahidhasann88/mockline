@@ -2,6 +2,7 @@ import { deriveSeed, SeededRandom } from './generate/rng.js';
 import { generateFromSchema } from './generate/schema.js';
 import { defaultStatus } from './spec/summary.js';
 import { problem } from './errors.js';
+import { renderHeaders, renderTemplate, type TemplateContext } from './template.js';
 import type {
   MocklineConfig,
   OverrideConfig,
@@ -27,6 +28,8 @@ export interface SelectionInput {
   requestCounter?: number;
   sequenceIndexes?: ReadonlyMap<string, number>;
   stateResponse?: MockResponse | (() => MockResponse | undefined);
+  params?: Record<string, string>;
+  now?: Date;
 }
 
 export interface SelectionResult {
@@ -455,10 +458,18 @@ export function selectResponse(input: SelectionInput): SelectionResult {
       overrideDelay = value.delay;
       const operationStatus = defaultStatus(input.route.operation.responses);
       const fallbackStatus = operationStatus === 'default' ? 200 : Number(operationStatus);
+      const templateContext: TemplateContext = {
+        method: input.route.method,
+        url: input.url,
+        headers: input.headers,
+        params: input.params ?? {},
+        body: input.body,
+        now: input.now ?? new Date(),
+      };
       response = {
         status: value.status ?? fallbackStatus,
-        ...(value.body !== undefined ? { body: value.body } : {}),
-        ...(value.headers ? { headers: value.headers } : {}),
+        ...(value.body !== undefined ? { body: renderTemplate(value.body, templateContext) } : {}),
+        ...(value.headers ? { headers: renderHeaders(value.headers, templateContext) } : {}),
         ...(value.delay !== undefined ? { delay: value.delay } : {}),
         source: 'override',
       };

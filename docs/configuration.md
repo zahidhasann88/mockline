@@ -101,6 +101,27 @@ overrides:
 `eq` (default), `contains` or `regex`. Any override can also set `headers` and
 `delay`.
 
+### Templates
+
+Override bodies and headers can use values from the request:
+
+```yaml
+overrides:
+  getPet:
+    body: { id: '{{request.path.petId}}', name: 'Pet {{request.path.petId}}' }
+  createPet:
+    status: 201
+    body: { id: '{{uuid}}', name: '{{request.body.name}}', createdAt: '{{now}}' }
+```
+
+Available: `request.method`, `request.url`, `request.path`, `request.path.<param>`,
+`request.query.<name>`, `request.header.<name>`, `request.body` and
+`request.body.<field>` (e.g. `request.body.items.0.id`), plus `now` and `uuid`.
+
+A value that is only a placeholder keeps its type, so `'{{request.body.age}}'`
+stays a number. Missing values become `null`, or empty text inside a longer
+string.
+
 ## Seed and state files
 
 `stateful.seed` and `stateful.file` use the same JSON format. Keys are list
