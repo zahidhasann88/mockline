@@ -1,6 +1,6 @@
 # Changelog
 
-## [Unreleased]
+## [0.6.0] - 2026-10-27
 
 ### Changed
 
@@ -10,13 +10,13 @@
   swagger-parser 13. Generated data for a given seed may differ from 0.5.x.
 - `config.schema.json` now lists settings at the top level instead of under
   `definitions`.
-- For Vitest 5, add `toHaveReceived` types with `interface Matchers<R, T> extends
-MocklineMatchers<R, T>` (see the testing docs).
+- Vitest 5 users: update the `toHaveReceived` typing as shown in the testing docs.
 
 ### Fixed
 
 - Types used in the public API, such as `JsonSchema`, `MatchedRoute` and
   `MockResponse`, are now exported.
+- Updated `fast-uri` (used by the schema validator) to 3.1.9 for its security fixes.
 
 ## [0.5.0] - 2026-10-27
 
