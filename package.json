@@ -1,6 +1,6 @@
 {
   "name": "@zahid15/mockline",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "A local mock API server and TypeScript library powered by OpenAPI.",
   "license": "MIT",
   "type": "module",
