@@ -40,4 +40,15 @@ export type {
   AuthSettings,
   SecurityResult,
 } from './validate.js';
-export type { RecordedRequest, RequestFilter, ResponseSource } from './types.js';
+export type {
+  ApiOperation,
+  ApiResponse,
+  JsonSchema,
+  MatchedRoute,
+  MockResponse,
+  OpenApiDocument,
+  RecordedRequest,
+  RequestFilter,
+  ResponseSource,
+  SummaryOperation,
+} from './types.js';

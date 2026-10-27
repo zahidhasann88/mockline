@@ -536,7 +536,7 @@ export async function runCli(argv = process.argv.slice(2)): Promise<number> {
       }),
     );
 
-  cli.on('command:*', () => {
+  cli.addEventListener('command:*', () => {
     console.error(`Unknown command: ${argv[0] ?? ''}`);
     cli.outputHelp();
     failureCode = 2;

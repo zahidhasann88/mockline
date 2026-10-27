@@ -9,7 +9,7 @@ const httpUrl = z
 const responseShape = z.object({
   status: z.number().int().min(100).max(599).optional(),
   body: z.unknown().optional(),
-  headers: z.record(z.string()).optional(),
+  headers: z.record(z.string(), z.string()).optional(),
   delay: nonNegative.optional(),
 });
 
@@ -17,13 +17,13 @@ const conditionSchema = z.object({
   location: z.enum(['query', 'header', 'body']),
   name: z.string().min(1),
   op: z.enum(['eq', 'contains', 'regex']).default('eq'),
-  value: z.unknown(),
+  value: z.unknown().optional(),
 });
 
 const overrideSchema = z.object({
   status: z.number().int().min(100).max(599).optional(),
   body: z.unknown().optional(),
-  headers: z.record(z.string()).optional(),
+  headers: z.record(z.string(), z.string()).optional(),
   delay: nonNegative.optional(),
   sequence: z.array(responseShape).min(1).optional(),
   loop: z.boolean().default(false),
@@ -69,9 +69,9 @@ export const configSchema = z.object({
     .object({
       rate: z.number().min(0).max(1).default(0),
       statuses: z.array(z.number().int().min(400).max(599)).min(1).default([500, 503]),
-      perOperationRates: z.record(z.number().min(0).max(1)).default({}),
+      perOperationRates: z.record(z.string(), z.number().min(0).max(1)).prefault({}),
     })
-    .default({}),
+    .prefault({}),
   validate: z.enum(['off', 'warn', 'strict']).default('warn'),
   stateful: z
     .object({
@@ -82,8 +82,8 @@ export const configSchema = z.object({
       seed: z.string().min(1).optional(),
       file: z.string().min(1).optional(),
     })
-    .default({}),
-  overrides: z.record(overrideSchema).default({}),
+    .prefault({}),
+  overrides: z.record(z.string(), overrideSchema).prefault({}),
   proxy: z
     .object({
       url: z
@@ -103,13 +103,13 @@ export const configSchema = z.object({
       message: 'proxy.url is required when proxy.all is true',
       path: ['url'],
     })
-    .default({}),
+    .prefault({}),
   cors: z
     .object({
       enabled: z.boolean().default(true),
       origins: z.array(z.string()).default(['*']),
     })
-    .default({}),
+    .prefault({}),
   recording: z
     .object({
       enabled: z.boolean().default(true),
@@ -119,13 +119,14 @@ export const configSchema = z.object({
         .array(z.string())
         .default(['authorization', 'cookie', 'set-cookie', 'x-api-key', 'api-key', 'x-auth-token']),
     })
-    .default({}),
+    .prefault({}),
   generation: z
     .object({
       hints: z
         .union([
           z.boolean(),
           z.record(
+            z.string(),
             z.union([
               z.string(),
               z.number(),
@@ -149,7 +150,7 @@ export const configSchema = z.object({
       message: 'minArrayItems must not exceed maxArrayItems',
       path: ['minArrayItems'],
     })
-    .default({}),
+    .prefault({}),
   events: z
     .object({
       callbacks: z.boolean().default(true),
@@ -157,9 +158,9 @@ export const configSchema = z.object({
       timeoutMs: z.number().int().positive().default(5000),
       allowPrivate: z.boolean().default(false),
       webhookUrl: httpUrl.optional(),
-      webhooks: z.record(httpUrl).default({}),
+      webhooks: z.record(z.string(), httpUrl).prefault({}),
     })
-    .default({}),
+    .prefault({}),
   auth: z
     .object({
       apiKeys: z.array(z.string().min(1)).default([]),
@@ -167,9 +168,9 @@ export const configSchema = z.object({
       basic: z.array(z.object({ username: z.string(), password: z.string() })).default([]),
       jwtSecret: z.string().min(1).optional(),
     })
-    .default({}),
-  controlHeaders: z.object({ allow: z.boolean().default(true) }).default({}),
-  inspector: z.object({ enabled: z.boolean().optional() }).default({}),
+    .prefault({}),
+  controlHeaders: z.object({ allow: z.boolean().default(true) }).prefault({}),
+  inspector: z.object({ enabled: z.boolean().optional() }).prefault({}),
   enforceAuth: z.boolean().default(false),
   requestBodyLimit: z.number().int().positive().default(1_048_576),
   requestTimeoutMs: z.number().int().positive().default(30_000),

@@ -27,7 +27,7 @@ tests and demos.
 
 ## Install
 
-Requires Node.js 20 or later.
+Requires Node.js 22 or later.
 
 ```sh
 npm install --global @zahid15/mockline

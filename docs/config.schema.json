@@ -1,161 +1,257 @@
 {
-  "$ref": "#/definitions/MocklineConfig",
-  "definitions": {
-    "MocklineConfig": {
-      "type": "object",
-      "properties": {
-        "port": {
-          "type": "integer",
-          "minimum": 0,
-          "maximum": 65535,
-          "default": 4010
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "properties": {
+    "port": {
+      "default": 4010,
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 65535
+    },
+    "host": {
+      "default": "127.0.0.1",
+      "type": "string",
+      "minLength": 1
+    },
+    "seed": {
+      "type": "integer",
+      "minimum": -9007199254740991,
+      "maximum": 9007199254740991
+    },
+    "prefer": {
+      "default": "example",
+      "type": "string",
+      "enum": [
+        "example",
+        "generate"
+      ]
+    },
+    "latency": {
+      "default": 0,
+      "anyOf": [
+        {
+          "type": "number",
+          "minimum": 0
         },
-        "host": {
-          "type": "string",
-          "minLength": 1,
-          "default": "127.0.0.1"
-        },
-        "seed": {
-          "type": "integer"
-        },
-        "prefer": {
-          "type": "string",
-          "enum": [
-            "example",
-            "generate"
-          ],
-          "default": "example"
-        },
-        "latency": {
-          "anyOf": [
+        {
+          "type": "array",
+          "items": [
             {
               "type": "number",
               "minimum": 0
             },
             {
-              "type": "array",
-              "minItems": 2,
-              "maxItems": 2,
-              "items": [
-                {
-                  "type": "number",
-                  "minimum": 0
-                },
-                {
-                  "type": "number",
-                  "minimum": 0
-                }
-              ]
+              "type": "number",
+              "minimum": 0
+            }
+          ],
+          "additionalItems": false,
+          "minItems": 2,
+          "maxItems": 2
+        },
+        {
+          "type": "object",
+          "properties": {
+            "fixed": {
+              "type": "number",
+              "minimum": 0
             },
-            {
+            "min": {
+              "type": "number",
+              "minimum": 0
+            },
+            "max": {
+              "type": "number",
+              "minimum": 0
+            },
+            "distribution": {
+              "default": "uniform",
+              "type": "string",
+              "enum": [
+                "uniform",
+                "normal"
+              ]
+            }
+          },
+          "additionalProperties": false
+        }
+      ]
+    },
+    "errors": {
+      "default": {},
+      "type": "object",
+      "properties": {
+        "rate": {
+          "default": 0,
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "statuses": {
+          "default": [
+            500,
+            503
+          ],
+          "minItems": 1,
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "minimum": 400,
+            "maximum": 599
+          }
+        },
+        "perOperationRates": {
+          "default": {},
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "validate": {
+      "default": "warn",
+      "type": "string",
+      "enum": [
+        "off",
+        "warn",
+        "strict"
+      ]
+    },
+    "stateful": {
+      "default": {},
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "default": false,
+          "type": "boolean"
+        },
+        "seedItems": {
+          "default": 3,
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "idProperty": {
+          "default": "id",
+          "type": "string",
+          "minLength": 1
+        },
+        "relations": {
+          "default": true,
+          "type": "boolean"
+        },
+        "seed": {
+          "type": "string",
+          "minLength": 1
+        },
+        "file": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "additionalProperties": false
+    },
+    "overrides": {
+      "default": {},
+      "type": "object",
+      "propertyNames": {
+        "type": "string"
+      },
+      "additionalProperties": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "integer",
+            "minimum": 100,
+            "maximum": 599
+          },
+          "body": {},
+          "headers": {
+            "type": "object",
+            "propertyNames": {
+              "type": "string"
+            },
+            "additionalProperties": {
+              "type": "string"
+            }
+          },
+          "delay": {
+            "type": "number",
+            "minimum": 0
+          },
+          "sequence": {
+            "minItems": 1,
+            "type": "array",
+            "items": {
               "type": "object",
               "properties": {
-                "fixed": {
+                "status": {
+                  "type": "integer",
+                  "minimum": 100,
+                  "maximum": 599
+                },
+                "body": {},
+                "headers": {
+                  "type": "object",
+                  "propertyNames": {
+                    "type": "string"
+                  },
+                  "additionalProperties": {
+                    "type": "string"
+                  }
+                },
+                "delay": {
                   "type": "number",
                   "minimum": 0
-                },
-                "min": {
-                  "type": "number",
-                  "minimum": 0
-                },
-                "max": {
-                  "type": "number",
-                  "minimum": 0
-                },
-                "distribution": {
-                  "type": "string",
-                  "enum": [
-                    "uniform",
-                    "normal"
-                  ],
-                  "default": "uniform"
                 }
               },
               "additionalProperties": false
             }
-          ],
-          "default": 0
-        },
-        "errors": {
-          "type": "object",
-          "properties": {
-            "rate": {
-              "type": "number",
-              "minimum": 0,
-              "maximum": 1,
-              "default": 0
-            },
-            "statuses": {
-              "type": "array",
-              "items": {
-                "type": "integer",
-                "minimum": 400,
-                "maximum": 599
-              },
-              "minItems": 1,
-              "default": [
-                500,
-                503
-              ]
-            },
-            "perOperationRates": {
-              "type": "object",
-              "additionalProperties": {
-                "type": "number",
-                "minimum": 0,
-                "maximum": 1
-              },
-              "default": {}
-            }
           },
-          "additionalProperties": false,
-          "default": {}
-        },
-        "validate": {
-          "type": "string",
-          "enum": [
-            "off",
-            "warn",
-            "strict"
-          ],
-          "default": "warn"
-        },
-        "stateful": {
-          "type": "object",
-          "properties": {
-            "enabled": {
-              "type": "boolean",
-              "default": false
-            },
-            "seedItems": {
-              "type": "integer",
-              "minimum": 0,
-              "default": 3
-            },
-            "idProperty": {
-              "type": "string",
-              "minLength": 1,
-              "default": "id"
-            },
-            "relations": {
-              "type": "boolean",
-              "default": true
-            },
-            "seed": {
-              "type": "string",
-              "minLength": 1
-            },
-            "file": {
-              "type": "string",
-              "minLength": 1
-            }
+          "loop": {
+            "default": false,
+            "type": "boolean"
           },
-          "additionalProperties": false,
-          "default": {}
-        },
-        "overrides": {
-          "type": "object",
-          "additionalProperties": {
+          "when": {
+            "type": "object",
+            "properties": {
+              "location": {
+                "type": "string",
+                "enum": [
+                  "query",
+                  "header",
+                  "body"
+                ]
+              },
+              "name": {
+                "type": "string",
+                "minLength": 1
+              },
+              "op": {
+                "default": "eq",
+                "type": "string",
+                "enum": [
+                  "eq",
+                  "contains",
+                  "regex"
+                ]
+              },
+              "value": {}
+            },
+            "required": [
+              "location",
+              "name"
+            ],
+            "additionalProperties": false
+          },
+          "response": {
             "type": "object",
             "properties": {
               "status": {
@@ -166,6 +262,9 @@
               "body": {},
               "headers": {
                 "type": "object",
+                "propertyNames": {
+                  "type": "string"
+                },
                 "additionalProperties": {
                   "type": "string"
                 }
@@ -173,10 +272,48 @@
               "delay": {
                 "type": "number",
                 "minimum": 0
-              },
-              "sequence": {
-                "type": "array",
-                "items": {
+              }
+            },
+            "additionalProperties": false
+          },
+          "rules": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "when": {
+                  "type": "object",
+                  "properties": {
+                    "location": {
+                      "type": "string",
+                      "enum": [
+                        "query",
+                        "header",
+                        "body"
+                      ]
+                    },
+                    "name": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "op": {
+                      "default": "eq",
+                      "type": "string",
+                      "enum": [
+                        "eq",
+                        "contains",
+                        "regex"
+                      ]
+                    },
+                    "value": {}
+                  },
+                  "required": [
+                    "location",
+                    "name"
+                  ],
+                  "additionalProperties": false
+                },
+                "response": {
                   "type": "object",
                   "properties": {
                     "status": {
@@ -187,6 +324,9 @@
                     "body": {},
                     "headers": {
                       "type": "object",
+                      "propertyNames": {
+                        "type": "string"
+                      },
                       "additionalProperties": {
                         "type": "string"
                       }
@@ -197,416 +337,306 @@
                     }
                   },
                   "additionalProperties": false
-                },
-                "minItems": 1
-              },
-              "loop": {
-                "type": "boolean",
-                "default": false
-              },
-              "when": {
-                "type": "object",
-                "properties": {
-                  "location": {
-                    "type": "string",
-                    "enum": [
-                      "query",
-                      "header",
-                      "body"
-                    ]
-                  },
-                  "name": {
-                    "type": "string",
-                    "minLength": 1
-                  },
-                  "op": {
-                    "type": "string",
-                    "enum": [
-                      "eq",
-                      "contains",
-                      "regex"
-                    ],
-                    "default": "eq"
-                  },
-                  "value": {}
-                },
-                "required": [
-                  "location",
-                  "name"
-                ],
-                "additionalProperties": false
-              },
-              "response": {
-                "type": "object",
-                "properties": {
-                  "status": {
-                    "type": "integer",
-                    "minimum": 100,
-                    "maximum": 599
-                  },
-                  "body": {},
-                  "headers": {
-                    "type": "object",
-                    "additionalProperties": {
-                      "type": "string"
-                    }
-                  },
-                  "delay": {
-                    "type": "number",
-                    "minimum": 0
-                  }
-                },
-                "additionalProperties": false
-              },
-              "rules": {
-                "type": "array",
-                "items": {
-                  "type": "object",
-                  "properties": {
-                    "when": {
-                      "type": "object",
-                      "properties": {
-                        "location": {
-                          "type": "string",
-                          "enum": [
-                            "query",
-                            "header",
-                            "body"
-                          ]
-                        },
-                        "name": {
-                          "type": "string",
-                          "minLength": 1
-                        },
-                        "op": {
-                          "type": "string",
-                          "enum": [
-                            "eq",
-                            "contains",
-                            "regex"
-                          ],
-                          "default": "eq"
-                        },
-                        "value": {}
-                      },
-                      "required": [
-                        "location",
-                        "name"
-                      ],
-                      "additionalProperties": false
-                    },
-                    "response": {
-                      "type": "object",
-                      "properties": {
-                        "status": {
-                          "type": "integer",
-                          "minimum": 100,
-                          "maximum": 599
-                        },
-                        "body": {},
-                        "headers": {
-                          "type": "object",
-                          "additionalProperties": {
-                            "type": "string"
-                          }
-                        },
-                        "delay": {
-                          "type": "number",
-                          "minimum": 0
-                        }
-                      },
-                      "additionalProperties": false
-                    }
-                  },
-                  "required": [
-                    "when",
-                    "response"
-                  ],
-                  "additionalProperties": false
                 }
-              }
-            },
-            "additionalProperties": false
-          },
-          "default": {}
-        },
-        "proxy": {
-          "type": "object",
-          "properties": {
-            "url": {
-              "type": "string",
-              "format": "uri"
-            },
-            "all": {
-              "type": "boolean",
-              "default": false
-            },
-            "allowPrivate": {
-              "type": "boolean",
-              "default": false
-            },
-            "timeoutMs": {
-              "type": "integer",
-              "exclusiveMinimum": 0,
-              "default": 5000
-            },
-            "recordFile": {
-              "type": "string"
-            },
-            "recordSpec": {
-              "type": "string",
-              "minLength": 1
-            }
-          },
-          "additionalProperties": false,
-          "default": {}
-        },
-        "cors": {
-          "type": "object",
-          "properties": {
-            "enabled": {
-              "type": "boolean",
-              "default": true
-            },
-            "origins": {
-              "type": "array",
-              "items": {
-                "type": "string"
               },
-              "default": [
-                "*"
-              ]
-            }
-          },
-          "additionalProperties": false,
-          "default": {}
-        },
-        "recording": {
-          "type": "object",
-          "properties": {
-            "enabled": {
-              "type": "boolean",
-              "default": true
-            },
-            "file": {
-              "type": "string"
-            },
-            "maxRequests": {
-              "type": "integer",
-              "exclusiveMinimum": 0,
-              "default": 500
-            },
-            "redactHeaders": {
-              "type": "array",
-              "items": {
-                "type": "string"
-              },
-              "default": [
-                "authorization",
-                "cookie",
-                "set-cookie",
-                "x-api-key",
-                "api-key",
-                "x-auth-token"
-              ]
-            }
-          },
-          "additionalProperties": false,
-          "default": {}
-        },
-        "generation": {
-          "type": "object",
-          "properties": {
-            "hints": {
-              "anyOf": [
-                {
-                  "type": "boolean"
-                },
-                {
-                  "type": "object",
-                  "additionalProperties": {
-                    "anyOf": [
-                      {
-                        "type": "string"
-                      },
-                      {
-                        "type": "number"
-                      },
-                      {
-                        "type": "boolean"
-                      },
-                      {
-                        "type": "null"
-                      },
-                      {
-                        "type": "array",
-                        "items": {
-                          "type": [
-                            "string",
-                            "number",
-                            "boolean",
-                            "null"
-                          ]
-                        }
-                      }
-                    ]
-                  }
-                }
+              "required": [
+                "when",
+                "response"
               ],
-              "default": true
-            },
-            "counter": {
-              "type": "boolean",
-              "default": false
-            },
-            "locale": {
-              "type": "string",
-              "default": "en"
-            },
-            "maxDepth": {
-              "type": "integer",
-              "minimum": 0,
-              "maximum": 20,
-              "default": 3
-            },
-            "minArrayItems": {
-              "type": "integer",
-              "minimum": 0,
-              "default": 1
-            },
-            "maxArrayItems": {
-              "type": "integer",
-              "minimum": 0,
-              "default": 3
+              "additionalProperties": false
             }
-          },
-          "additionalProperties": false,
-          "default": {}
+          }
         },
-        "events": {
-          "type": "object",
-          "properties": {
-            "callbacks": {
-              "type": "boolean",
-              "default": true
-            },
-            "delay": {
-              "type": "number",
-              "minimum": 0,
-              "default": 0
-            },
-            "timeoutMs": {
-              "type": "integer",
-              "exclusiveMinimum": 0,
-              "default": 5000
-            },
-            "allowPrivate": {
-              "type": "boolean",
-              "default": false
-            },
-            "webhookUrl": {
-              "type": "string",
-              "format": "uri"
-            },
-            "webhooks": {
-              "type": "object",
-              "additionalProperties": {
-                "type": "string",
-                "format": "uri"
-              },
-              "default": {}
-            }
-          },
-          "additionalProperties": false,
-          "default": {}
+        "additionalProperties": false
+      }
+    },
+    "proxy": {
+      "default": {},
+      "type": "object",
+      "properties": {
+        "url": {
+          "type": "string",
+          "format": "uri"
         },
-        "auth": {
-          "type": "object",
-          "properties": {
-            "apiKeys": {
-              "type": "array",
-              "items": {
-                "type": "string",
-                "minLength": 1
-              },
-              "default": []
-            },
-            "bearerTokens": {
-              "type": "array",
-              "items": {
-                "type": "string",
-                "minLength": 1
-              },
-              "default": []
-            },
-            "basic": {
-              "type": "array",
-              "items": {
-                "type": "object",
-                "properties": {
-                  "username": {
-                    "type": "string"
-                  },
-                  "password": {
-                    "type": "string"
-                  }
-                },
-                "required": [
-                  "username",
-                  "password"
-                ],
-                "additionalProperties": false
-              },
-              "default": []
-            },
-            "jwtSecret": {
-              "type": "string",
-              "minLength": 1
-            }
-          },
-          "additionalProperties": false,
-          "default": {}
+        "all": {
+          "default": false,
+          "type": "boolean"
         },
-        "controlHeaders": {
-          "type": "object",
-          "properties": {
-            "allow": {
-              "type": "boolean",
-              "default": true
-            }
-          },
-          "additionalProperties": false,
-          "default": {}
+        "allowPrivate": {
+          "default": false,
+          "type": "boolean"
         },
-        "inspector": {
-          "type": "object",
-          "properties": {
-            "enabled": {
-              "type": "boolean"
-            }
-          },
-          "additionalProperties": false,
-          "default": {}
-        },
-        "enforceAuth": {
-          "type": "boolean",
-          "default": false
-        },
-        "requestBodyLimit": {
+        "timeoutMs": {
+          "default": 5000,
           "type": "integer",
           "exclusiveMinimum": 0,
-          "default": 1048576
+          "maximum": 9007199254740991
         },
-        "requestTimeoutMs": {
-          "type": "integer",
-          "exclusiveMinimum": 0,
-          "default": 30000
+        "recordFile": {
+          "type": "string"
+        },
+        "recordSpec": {
+          "type": "string",
+          "minLength": 1
         }
       },
       "additionalProperties": false
+    },
+    "cors": {
+      "default": {},
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "default": true,
+          "type": "boolean"
+        },
+        "origins": {
+          "default": [
+            "*"
+          ],
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "recording": {
+      "default": {},
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "default": true,
+          "type": "boolean"
+        },
+        "file": {
+          "type": "string"
+        },
+        "maxRequests": {
+          "default": 500,
+          "type": "integer",
+          "exclusiveMinimum": 0,
+          "maximum": 9007199254740991
+        },
+        "redactHeaders": {
+          "default": [
+            "authorization",
+            "cookie",
+            "set-cookie",
+            "x-api-key",
+            "api-key",
+            "x-auth-token"
+          ],
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "generation": {
+      "default": {},
+      "type": "object",
+      "properties": {
+        "hints": {
+          "default": true,
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "object",
+              "propertyNames": {
+                "type": "string"
+              },
+              "additionalProperties": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "boolean"
+                  },
+                  {
+                    "type": "null"
+                  },
+                  {
+                    "type": "array",
+                    "items": {
+                      "type": [
+                        "string",
+                        "number",
+                        "boolean",
+                        "null"
+                      ]
+                    }
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        "counter": {
+          "default": false,
+          "type": "boolean"
+        },
+        "locale": {
+          "default": "en",
+          "type": "string"
+        },
+        "maxDepth": {
+          "default": 3,
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 20
+        },
+        "minArrayItems": {
+          "default": 1,
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "maxArrayItems": {
+          "default": 3,
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        }
+      },
+      "additionalProperties": false
+    },
+    "events": {
+      "default": {},
+      "type": "object",
+      "properties": {
+        "callbacks": {
+          "default": true,
+          "type": "boolean"
+        },
+        "delay": {
+          "default": 0,
+          "type": "number",
+          "minimum": 0
+        },
+        "timeoutMs": {
+          "default": 5000,
+          "type": "integer",
+          "exclusiveMinimum": 0,
+          "maximum": 9007199254740991
+        },
+        "allowPrivate": {
+          "default": false,
+          "type": "boolean"
+        },
+        "webhookUrl": {
+          "type": "string",
+          "format": "uri"
+        },
+        "webhooks": {
+          "default": {},
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {
+            "type": "string",
+            "format": "uri"
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "auth": {
+      "default": {},
+      "type": "object",
+      "properties": {
+        "apiKeys": {
+          "default": [],
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "bearerTokens": {
+          "default": [],
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "basic": {
+          "default": [],
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "username": {
+                "type": "string"
+              },
+              "password": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "username",
+              "password"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "jwtSecret": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "additionalProperties": false
+    },
+    "controlHeaders": {
+      "default": {},
+      "type": "object",
+      "properties": {
+        "allow": {
+          "default": true,
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false
+    },
+    "inspector": {
+      "default": {},
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false
+    },
+    "enforceAuth": {
+      "default": false,
+      "type": "boolean"
+    },
+    "requestBodyLimit": {
+      "default": 1048576,
+      "type": "integer",
+      "exclusiveMinimum": 0,
+      "maximum": 9007199254740991
+    },
+    "requestTimeoutMs": {
+      "default": 30000,
+      "type": "integer",
+      "exclusiveMinimum": 0,
+      "maximum": 9007199254740991
     }
   },
-  "$schema": "http://json-schema.org/draft-07/schema#",
+  "additionalProperties": false,
   "title": "Mockline configuration",
   "description": "Configuration accepted by Mockline CLI and library."
 }

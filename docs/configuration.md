@@ -173,12 +173,15 @@ The server starts before the tests and stops after. Data and recorded requests
 reset before each test. Match requests by `"METHOD /path"`, `"/path"` or
 `operationId`.
 
-For `toHaveReceived` types in Vitest, add once:
+For `toHaveReceived` types in Vitest 5, add once:
 
 ```ts
 import type { MocklineMatchers } from '@zahid15/mockline/testing';
 
 declare module 'vitest' {
-  interface Assertion<T> extends MocklineMatchers<T> {}
+  interface Matchers<
+    R extends void | Promise<void> = void | Promise<void>,
+    T = unknown,
+  > extends MocklineMatchers<R, T> {}
 }
 ```

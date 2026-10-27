@@ -1,5 +1,23 @@
 # Changelog
 
+## [Unreleased]
+
+### Changed
+
+- Requires Node.js 22.22 or later. Node.js 20 is end of life; stay on 0.5.x if
+  you need it.
+- Upgraded dependencies, including zod 4, faker 10, chokidar 6, cac 7 and
+  swagger-parser 13. Generated data for a given seed may differ from 0.5.x.
+- `config.schema.json` now lists settings at the top level instead of under
+  `definitions`.
+- For Vitest 5, add `toHaveReceived` types with `interface Matchers<R, T> extends
+MocklineMatchers<R, T>` (see the testing docs).
+
+### Fixed
+
+- Types used in the public API, such as `JsonSchema`, `MatchedRoute` and
+  `MockResponse`, are now exported.
+
 ## [0.5.0] - 2026-10-27
 
 ### Added

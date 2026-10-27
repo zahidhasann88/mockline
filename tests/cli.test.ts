@@ -58,13 +58,16 @@ async function stopChild(child: ChildProcess): Promise<void> {
 
 describe('CLI', () => {
   it('handles help/version, invalid usage codes, and spec errors', async () => {
-    const output = vi.spyOn(console, 'log').mockImplementation(() => undefined);
+    const output = vi.spyOn(console, 'info').mockImplementation(() => undefined);
     const errors = vi.spyOn(console, 'error').mockImplementation(() => undefined);
     try {
       expect(await runCli([])).toBe(0);
       expect(await runCli(['--version'])).toBe(0);
-      expect(output).toHaveBeenCalled();
+      expect(String(output.mock.calls.at(-1)?.[0])).toMatch(/^mockline\/\d+\.\d+\.\d+/);
       expect(await runCli(['unknown-command'])).toBe(2);
+      expect(errors.mock.calls.some((call) => String(call[0]).includes('Unknown command'))).toBe(
+        true,
+      );
       expect(await runCli(['serve', fixture('petstore-30.yaml'), '--port', 'invalid'])).toBe(2);
       expect(
         await runCli(['serve', fixture('petstore-30.yaml'), '--proxy', 'ftp://example.test']),

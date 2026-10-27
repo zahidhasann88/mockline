@@ -150,12 +150,16 @@ describe('configuration', () => {
   it('publishes the generated config schema with editor metadata', async () => {
     const schema = JSON.parse(await readFile('docs/config.schema.json', 'utf8')) as {
       title?: string;
-      definitions?: {
-        MocklineConfig?: { properties?: Record<string, unknown> };
-      };
+      additionalProperties?: boolean;
+      required?: string[];
+      properties: Record<string, { additionalProperties?: unknown; default?: unknown }>;
     };
     expect(schema.title).toBe('Mockline configuration');
-    expect(schema.definitions?.MocklineConfig?.properties).toHaveProperty('generation');
-    expect(schema.definitions?.MocklineConfig?.properties).toHaveProperty('recording');
+    expect(schema.properties).toHaveProperty('generation');
+    expect(schema.properties).toHaveProperty('recording');
+    expect(schema.additionalProperties).toBe(false);
+    expect(schema.properties.stateful?.additionalProperties).toBe(false);
+    expect(schema.properties.port?.default).toBe(4010);
+    expect(schema.required ?? []).toEqual([]);
   });
 });

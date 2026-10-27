@@ -91,8 +91,8 @@ interface MatcherResult {
   message: () => string;
 }
 
-export interface MocklineMatchers<R = unknown> {
-  toHaveReceived(target: string, times?: number): R;
+export interface MocklineMatchers<R = unknown, T = MockServer> {
+  toHaveReceived: T extends MockServer ? (target: string, times?: number) => R : never;
 }
 
 export const mocklineMatchers = {

@@ -3,7 +3,10 @@ import { mocklineMatchers, useMockline, type MocklineMatchers } from '../src/tes
 import { fixture, silentLogger } from './helpers.js';
 
 declare module 'vitest' {
-  interface Assertion<T> extends MocklineMatchers<T> {}
+  interface Matchers<
+    R extends void | Promise<void> = void | Promise<void>,
+    T = unknown,
+  > extends MocklineMatchers<R, T> {}
 }
 
 expect.extend(mocklineMatchers);
