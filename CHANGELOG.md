@@ -6,6 +6,17 @@
 
 - Response templates: override bodies and headers can use request values, e.g.
   `{{request.path.petId}}`, `{{request.body.name}}`, `{{now}}` and `{{uuid}}`.
+- Stateful relations: requests under a parent that doesn't exist return 404, and
+  deleting a parent deletes its nested items. Turn off with `stateful.relations: false`.
+
+### Changed
+
+- Nested collections now require the parent item to exist (see above).
+
+### Fixed
+
+- The `config` option of `createMockServer` no longer requires fields that have
+  defaults, such as `op` in override rules.
 
 ## [0.3.0] - 2026-10-27
 

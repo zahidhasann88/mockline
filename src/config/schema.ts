@@ -77,6 +77,7 @@ export const configSchema = z.object({
       enabled: z.boolean().default(false),
       seedItems: z.number().int().min(0).default(3),
       idProperty: z.string().min(1).default('id'),
+      relations: z.boolean().default(true),
       seed: z.string().min(1).optional(),
       file: z.string().min(1).optional(),
     })
@@ -169,6 +170,7 @@ export const configSchema = z.object({
 });
 
 export type MocklineConfig = z.infer<typeof configSchema>;
+export type MocklineConfigInput = z.input<typeof configSchema>;
 export type OverrideConfig = z.input<typeof overrideSchema>;
 export type NormalizedOverrideConfig = MocklineConfig['overrides'][string];
 export type OverrideResponseConfig = z.infer<typeof responseShape>;

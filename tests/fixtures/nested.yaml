@@ -35,6 +35,11 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/User' }
+    delete:
+      operationId: deleteUser
+      responses:
+        '204':
+          description: Deleted
   /users/{userId}/posts:
     parameters:
       - { name: userId, in: path, required: true, schema: { type: string } }

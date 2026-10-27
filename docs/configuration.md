@@ -28,6 +28,7 @@ stateful:
   enabled: false
   seedItems: 3 # generated items per collection
   idProperty: id # also tries the path parameter name, uuid and _id
+  relations: true # nested items need an existing parent and are deleted with it
   seed: ./seed.json # start from these items (not set by default)
   file: ./state.json # load on start, save after each change (not set by default)
 

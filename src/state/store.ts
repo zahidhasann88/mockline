@@ -24,6 +24,7 @@ interface CollectionState {
   definition: ResourceCollection;
   scopes: Map<string, Scope>;
   keyPattern: RegExp;
+  parent?: CollectionState;
 }
 
 export interface ResourceStoreOptions {
@@ -171,6 +172,7 @@ export class ResourceStore {
         this.routeIndex.set(`${method} ${route.path}`, { state, kind: 'item', route });
       }
     }
+    this.linkParents();
     this.warnUnknownKeys(this.seedData);
     this.populate();
     if (options.initialData) {
@@ -218,6 +220,8 @@ export class ResourceStore {
       /\{([^{}]+)\}/g,
       (_whole, name: string) => params[name] ?? '',
     );
+    const missing = this.missingParent(state, key);
+    if (missing) return missing;
     const scope = this.scope(state, key, params);
     if (kind === 'list') {
       let items = scope.items.map((item) => ({ ...item }));
@@ -285,6 +289,7 @@ export class ResourceStore {
     if (route.method === 'DELETE') {
       if (index >= 0) {
         scope.items.splice(index, 1);
+        if (this.config.stateful.relations) this.removeChildren(`${key}/${rawId}`);
         this.changed();
       }
       return { status: 204, source: 'state' };
@@ -301,6 +306,41 @@ export class ResourceStore {
       return asResponse(defaultSuccessStatus(route), { ...scope.items[index] });
     }
     return undefined;
+  }
+
+  private linkParents(): void {
+    const shape = (path: string): string => path.replace(/\{[^{}]+\}/g, '{}');
+    for (const state of this.data.values()) {
+      const path = state.definition.path;
+      const prefix = path.slice(0, path.lastIndexOf('/'));
+      if (!prefix.endsWith('}')) continue;
+      state.parent = [...this.data.values()].find(
+        (candidate) =>
+          candidate !== state && shape(`${candidate.definition.path}/{}`) === shape(prefix),
+      );
+    }
+  }
+
+  private missingParent(state: CollectionState, key: string): MockResponse | undefined {
+    const parent = state.parent;
+    if (!parent || !this.config.stateful.relations) return undefined;
+    const itemPath = key.slice(0, key.lastIndexOf('/'));
+    const parentKey = itemPath.slice(0, itemPath.lastIndexOf('/'));
+    const parentId = itemPath.slice(itemPath.lastIndexOf('/') + 1);
+    const missing = this.missingParent(parent, parentKey);
+    if (missing) return missing;
+    const exists = this.scope(parent, parentKey, {}).items.some(
+      (item) => parseId(item[parent.definition.idProperty]) === parentId,
+    );
+    return exists ? undefined : notFound(parent.definition, parentId);
+  }
+
+  private removeChildren(itemPath: string): void {
+    for (const state of this.data.values()) {
+      for (const scopeKey of [...state.scopes.keys()]) {
+        if (scopeKey.startsWith(`${itemPath}/`)) state.scopes.delete(scopeKey);
+      }
+    }
   }
 
   private changed(): void {

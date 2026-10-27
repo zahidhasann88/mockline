@@ -66,7 +66,7 @@ describe('response templates', () => {
           createPet: {
             rules: [
               {
-                when: { location: 'body', name: 'name', op: 'eq', value: 'Rex' },
+                when: { location: 'body', name: 'name', value: 'Rex' },
                 response: { status: 201, body: { greeting: 'Hello {{request.body.name}}' } },
               },
             ],

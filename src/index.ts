@@ -11,6 +11,7 @@ export type { SentEvent, EventKind } from './events.js';
 export { configSchema, defaultConfig } from './config/schema.js';
 export type {
   MocklineConfig,
+  MocklineConfigInput,
   OverrideConfig,
   OverrideResponseConfig,
   ConditionConfig,

@@ -32,6 +32,8 @@ A collection needs `GET /pets` (returns an array), `POST /pets`, and
 - The id field is `id`, `petId`, `uuid` or `_id`, whichever the item has.
 - Lists support `limit`/`offset` (if declared) and filters like `?tag=dog`.
 - Nested lists like `/users/{userId}/posts` are kept per user.
+- Requests under a user that doesn't exist return `404`, and deleting a user
+  deletes their posts. Turn this off with `stateful.relations: false`.
 - Data is in memory, or in a file with `--state-file`.
 - `POST /__mockline/reset` restores the starting data.
 

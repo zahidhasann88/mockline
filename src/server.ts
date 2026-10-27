@@ -4,7 +4,12 @@ import { watch as watchFiles, type FSWatcher } from 'chokidar';
 import { loadConfig } from './config/load.js';
 import { isIP } from 'node:net';
 import { setTimeout as sleep } from 'node:timers/promises';
-import { configSchema, type MocklineConfig, type OverrideConfig } from './config/schema.js';
+import {
+  configSchema,
+  type MocklineConfig,
+  type MocklineConfigInput,
+  type OverrideConfig,
+} from './config/schema.js';
 import { MocklineError, problem } from './errors.js';
 import { createLogger, type Logger } from './logger.js';
 import { loadSpec, type LoadedSpec } from './spec/load.js';
@@ -77,7 +82,7 @@ export interface CreateMockServerOptions {
   port?: number;
   host?: string;
   seed?: number;
-  config?: DeepPartial<MocklineConfig>;
+  config?: DeepPartial<MocklineConfigInput>;
   inspector?: boolean;
   logger?: Logger;
   logRequests?: boolean;

@@ -30,32 +30,96 @@ describe('stateful collections', () => {
     try {
       const users = (await (await fetch(`${server.url}/users`)).json()) as Array<{ uuid: string }>;
       expect(users).toHaveLength(2);
-      const user = await fetch(`${server.url}/users/${users[0]?.uuid}`);
+      const alice = users[0]?.uuid ?? '';
+      const bob = users[1]?.uuid ?? '';
+      const user = await fetch(`${server.url}/users/${alice}`);
       expect(user.status).toBe(200);
 
-      const created = await fetch(`${server.url}/users/alice/posts`, {
+      const created = await fetch(`${server.url}/users/${alice}/posts`, {
         method: 'POST',
         headers: json,
         body: JSON.stringify({ title: 'Hello', status: 'draft' }),
       });
       expect(created.status).toBe(201);
       const post = (await created.json()) as { postId: number; userId: string };
-      expect(post.userId).toBe('alice');
-      expect((await fetch(`${server.url}/users/alice/posts/${post.postId}`)).status).toBe(200);
+      expect(post.userId).toBe(alice);
+      expect((await fetch(`${server.url}/users/${alice}/posts/${post.postId}`)).status).toBe(200);
 
       const alicePosts = (await (
-        await fetch(`${server.url}/users/alice/posts`)
+        await fetch(`${server.url}/users/${alice}/posts`)
       ).json()) as unknown[];
-      const bobPosts = (await (await fetch(`${server.url}/users/bob/posts`)).json()) as unknown[];
+      const bobPosts = (await (
+        await fetch(`${server.url}/users/${bob}/posts`)
+      ).json()) as unknown[];
       expect(alicePosts).toHaveLength(3);
       expect(bobPosts).toHaveLength(2);
       expect(bobPosts).not.toContainEqual(expect.objectContaining({ title: 'Hello' }));
 
       const drafts = (await (
-        await fetch(`${server.url}/users/alice/posts?status=draft`)
+        await fetch(`${server.url}/users/${alice}/posts?status=draft`)
       ).json()) as Array<{ status: string }>;
       expect(drafts.length).toBeGreaterThan(0);
       expect(drafts.every((item) => item.status === 'draft')).toBe(true);
+    } finally {
+      await server.close();
+    }
+  });
+
+  it('rejects children of missing parents and deletes children with their parent', async () => {
+    const server = await makeServer({
+      spec: fixture('nested.yaml'),
+      config: { validate: 'off', stateful: { enabled: true, seedItems: 1 } },
+    });
+    try {
+      const missing = await fetch(`${server.url}/users/nobody/posts`, {
+        method: 'POST',
+        headers: json,
+        body: JSON.stringify({ title: 'Orphan', status: 'draft' }),
+      });
+      expect(missing.status).toBe(404);
+      expect(await missing.json()).toMatchObject({
+        detail: 'No resource with uuid nobody exists.',
+      });
+      expect((await fetch(`${server.url}/users/nobody/posts`)).status).toBe(404);
+      expect((await fetch(`${server.url}/users/nobody/posts/1`)).status).toBe(404);
+
+      const created = (await (
+        await fetch(`${server.url}/users`, {
+          method: 'POST',
+          headers: json,
+          body: JSON.stringify({ name: 'Ada' }),
+        })
+      ).json()) as { uuid: string };
+      await fetch(`${server.url}/users/${created.uuid}/posts`, {
+        method: 'POST',
+        headers: json,
+        body: JSON.stringify({ title: 'Mine', status: 'published' }),
+      });
+      expect(
+        await (await fetch(`${server.url}/users/${created.uuid}/posts`)).json(),
+      ).toContainEqual(expect.objectContaining({ title: 'Mine' }));
+
+      expect(
+        (await fetch(`${server.url}/users/${created.uuid}`, { method: 'DELETE' })).status,
+      ).toBe(204);
+      expect((await fetch(`${server.url}/users/${created.uuid}/posts`)).status).toBe(404);
+    } finally {
+      await server.close();
+    }
+  });
+
+  it('allows any parent when relations are off', async () => {
+    const server = await makeServer({
+      spec: fixture('nested.yaml'),
+      config: { validate: 'off', stateful: { enabled: true, seedItems: 1, relations: false } },
+    });
+    try {
+      const created = await fetch(`${server.url}/users/anyone/posts`, {
+        method: 'POST',
+        headers: json,
+        body: JSON.stringify({ title: 'Free', status: 'draft' }),
+      });
+      expect(created.status).toBe(201);
     } finally {
       await server.close();
     }

@@ -137,6 +137,10 @@
               "minLength": 1,
               "default": "id"
             },
+            "relations": {
+              "type": "boolean",
+              "default": true
+            },
             "seed": {
               "type": "string",
               "minLength": 1
