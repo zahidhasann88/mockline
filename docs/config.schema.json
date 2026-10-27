@@ -471,6 +471,90 @@
           "additionalProperties": false,
           "default": {}
         },
+        "events": {
+          "type": "object",
+          "properties": {
+            "callbacks": {
+              "type": "boolean",
+              "default": true
+            },
+            "delay": {
+              "type": "number",
+              "minimum": 0,
+              "default": 0
+            },
+            "timeoutMs": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "default": 5000
+            },
+            "allowPrivate": {
+              "type": "boolean",
+              "default": false
+            },
+            "webhookUrl": {
+              "type": "string",
+              "format": "uri"
+            },
+            "webhooks": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "string",
+                "format": "uri"
+              },
+              "default": {}
+            }
+          },
+          "additionalProperties": false,
+          "default": {}
+        },
+        "auth": {
+          "type": "object",
+          "properties": {
+            "apiKeys": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1
+              },
+              "default": []
+            },
+            "bearerTokens": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1
+              },
+              "default": []
+            },
+            "basic": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "username": {
+                    "type": "string"
+                  },
+                  "password": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "username",
+                  "password"
+                ],
+                "additionalProperties": false
+              },
+              "default": []
+            },
+            "jwtSecret": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "additionalProperties": false,
+          "default": {}
+        },
         "controlHeaders": {
           "type": "object",
           "properties": {

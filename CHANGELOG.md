@@ -1,5 +1,21 @@
 # Changelog
 
+## [Unreleased]
+
+### Added
+
+- Callbacks: after a `2xx` response, Mockline sends the callbacks declared in the spec.
+- Webhooks: send spec webhooks with `POST /__mockline/webhooks/{name}` or
+  `server.sendWebhook()`, with `--webhook-url` or `events.webhooks` for targets.
+- `server.events()` and `GET /__mockline/events` list sent callbacks and webhooks.
+- Auth checks with the new `auth` config: API keys, basic credentials, bearer
+  tokens, and JWTs (HS256/384/512) with expiry and scopes. Missing scopes return 403.
+- `--no-callbacks` turns callbacks off.
+
+### Changed
+
+- Specs with callbacks or webhooks no longer show "not supported" warnings.
+
 ## [0.2.0] - 2026-10-27
 
 ### Added

@@ -3,8 +3,11 @@ export type {
   CreateMockServerOptions,
   MockServer,
   RequestAccessor,
+  EventAccessor,
+  SendWebhookOptions,
   DeepPartial,
 } from './server.js';
+export type { SentEvent, EventKind } from './events.js';
 export { configSchema, defaultConfig } from './config/schema.js';
 export type {
   MocklineConfig,
@@ -26,12 +29,14 @@ export {
   hashSeed,
 } from './generate/index.js';
 export type { GenerationOptions, GeneratorWarning } from './generate/index.js';
-export { validateRequest, checkSecurityPresence } from './validate.js';
+export { validateRequest, checkSecurity, checkSecurityPresence } from './validate.js';
 export { ResourceStore, detectCollections } from './state/index.js';
 export type { ResourceCollection, ResourceStoreOptions, StateData } from './state/index.js';
 export type {
   ValidationIssue,
   RequestValidationInput,
   RequestValidationResult,
+  AuthSettings,
+  SecurityResult,
 } from './validate.js';
 export type { RecordedRequest, RequestFilter, ResponseSource } from './types.js';

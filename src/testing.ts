@@ -65,6 +65,7 @@ export function useMockline(options: UseMocklineOptions): MocklineTestServer {
     hooks.beforeEach(async () => {
       await server?.reset();
       server?.requests.clear();
+      server?.events.clear();
     });
 
   return {
@@ -74,6 +75,10 @@ export function useMockline(options: UseMocklineOptions): MocklineTestServer {
     get requests() {
       return current().requests;
     },
+    get events() {
+      return current().events;
+    },
+    sendWebhook: (name, options) => current().sendWebhook(name, options),
     reset: () => current().reset(),
     setOverride: (key, override) => current().setOverride(key, override),
     close: () => current().close(),

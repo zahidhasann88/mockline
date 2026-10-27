@@ -15,7 +15,7 @@ seed: 0 # same seed = same generated data
 prefer: example # or: generate
 validate: warn # off, warn or strict
 latency: 0 # ms: 25, [10, 80] or { min, max, distribution: normal }
-enforceAuth: false # require declared credentials (not verified)
+enforceAuth: false # require the credentials declared in the spec
 requestBodyLimit: 1048576 # bytes
 requestTimeoutMs: 30000
 
@@ -54,6 +54,20 @@ recording:
   file: ./requests.jsonl # also append requests here (not set by default)
   maxRequests: 500
   redactHeaders: [authorization, cookie, set-cookie, x-api-key, api-key, x-auth-token]
+
+events:
+  callbacks: true # send callbacks declared in the spec
+  delay: 0 # ms before sending
+  timeoutMs: 5000
+  allowPrivate: false # localhost is always allowed; this allows other private addresses
+  webhookUrl: http://localhost:3000/hooks # default webhook target (not set by default)
+  webhooks: {} # per-webhook targets, e.g. { newPet: http://localhost:3000/pets }
+
+auth: # setting any value turns on checks, like enforceAuth
+  apiKeys: [] # accepted API keys
+  bearerTokens: [] # accepted bearer tokens
+  basic: [] # e.g. [{ username: ada, password: secret }]
+  jwtSecret: my-secret # verify HS256/384/512 JWTs (not set by default)
 
 controlHeaders:
   allow: true # false ignores Prefer and X-Mockline-* headers
@@ -100,6 +114,17 @@ paths (or the list `operationId`):
 ```
 
 To go back to the seed data, delete the state file or call reset.
+
+## Webhooks
+
+Webhooks come from the spec's `webhooks` section (OpenAPI 3.1). Send one with:
+
+```sh
+curl -X POST http://127.0.0.1:4010/__mockline/webhooks/newPet
+```
+
+The payload comes from the spec. Post a JSON body to send your own, or add
+`?url=` to change the target. In code, use `server.sendWebhook('newPet')`.
 
 ## Testing
 

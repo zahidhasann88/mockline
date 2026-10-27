@@ -93,20 +93,11 @@ export function inspectSpec(document: OpenApiDocument): SpecWarning[] {
         path: entry.path,
       });
     }
-    if (entry.operation.callbacks)
-      warnings.push({ message: 'Callbacks are not supported.', path: entry.path });
     if (entry.operation.links)
       warnings.push({
         message: 'Response links are ignored by the mock server.',
         path: entry.path,
       });
-  }
-  if (
-    document.webhooks &&
-    isRecord(document.webhooks) &&
-    Object.keys(document.webhooks).length > 0
-  ) {
-    warnings.push({ message: 'Webhooks are not served by Mockline.' });
   }
   return warnings;
 }

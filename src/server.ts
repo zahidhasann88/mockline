@@ -15,8 +15,17 @@ import { handleInspector } from './inspector.js';
 import { ResourceStore } from './state/store.js';
 import { readStateFile, StateFileWriter } from './state/file.js';
 import { forwardRequest, ProxyExampleRecorder } from './proxy.js';
+import { deriveSeed } from './generate/rng.js';
 import {
-  checkSecurityPresence,
+  EventSender,
+  eventPayload,
+  expandTemplate,
+  pathItemOperations,
+  type ExpressionContext,
+  type SentEvent,
+} from './events.js';
+import {
+  checkSecurity,
   strictValidationStatus,
   validateRequest,
   type ValidationIssue,
@@ -41,7 +50,20 @@ export interface MockServer {
   readonly requests: RequestAccessor;
   reset(): Promise<void>;
   setOverride(key: string, override: OverrideConfig): void;
+  readonly events: EventAccessor;
+  sendWebhook(name: string, options?: SendWebhookOptions): Promise<SentEvent>;
   close(): Promise<void>;
+}
+
+export interface EventAccessor {
+  (): SentEvent[];
+  clear(): void;
+  wait(): Promise<void>;
+}
+
+export interface SendWebhookOptions {
+  body?: unknown;
+  url?: string;
 }
 
 export type DeepPartial<T> = T extends readonly unknown[]
@@ -95,6 +117,17 @@ function asHeaders(
   headers: IncomingMessage['headers'],
 ): Record<string, string | string[] | undefined> {
   return headers;
+}
+
+function authEnabled(config: MocklineConfig): boolean {
+  const { apiKeys, bearerTokens, basic, jwtSecret } = config.auth;
+  return (
+    config.enforceAuth ||
+    apiKeys.length > 0 ||
+    bearerTokens.length > 0 ||
+    basic.length > 0 ||
+    Boolean(jwtSecret)
+  );
 }
 
 function isLoopback(host: string): boolean {
@@ -331,6 +364,83 @@ export async function createMockServer(options: CreateMockServerOptions): Promis
   const startedAt = options.clock?.() ?? new Date();
   const boundPort = config.port;
   const boundHost = config.host;
+  const events = new EventSender(
+    () => config.events,
+    options.fetch,
+    options.clock,
+    (event) => {
+      const outcome = event.error ?? String(event.status);
+      const line = `${event.kind} ${event.name}: ${event.method} ${event.url} -> ${outcome}`;
+      if (event.error || (event.status ?? 0) >= 400) logger.warn(line);
+      else if (options.logRequests) logger.info(line);
+    },
+  );
+  let eventCounter = 0;
+  const fireCallbacks = (matched: MatchedRoute, context: ExpressionContext): void => {
+    const callbacks = isRecord(matched.operation.callbacks) ? matched.operation.callbacks : {};
+    for (const [name, callback] of Object.entries(callbacks)) {
+      if (!isRecord(callback)) continue;
+      for (const [template, pathItem] of Object.entries(callback)) {
+        const target = expandTemplate(template, context);
+        if (!target) {
+          logger.warn(`callback ${name}: could not build a URL from ${template}`);
+          continue;
+        }
+        for (const { method: callbackMethod, operation } of pathItemOperations(pathItem)) {
+          const payload = eventPayload(
+            operation,
+            specState.current.document,
+            config,
+            deriveSeed(config.seed ?? 0, 'callback', name, eventCounter++),
+          );
+          events.schedule({
+            kind: 'callback',
+            name,
+            method: callbackMethod,
+            url: target,
+            ...payload,
+          });
+        }
+      }
+    }
+  };
+  const webhookNames = (): Array<{ name: string; url?: string }> => {
+    const webhooks = specState.current.document.webhooks;
+    if (!isRecord(webhooks)) return [];
+    return Object.keys(webhooks).map((name) => {
+      const url = config.events.webhooks[name] ?? config.events.webhookUrl;
+      return url ? { name, url } : { name };
+    });
+  };
+  const sendWebhook = async (
+    name: string,
+    webhookOptions: SendWebhookOptions = {},
+  ): Promise<SentEvent> => {
+    const webhooks = specState.current.document.webhooks;
+    const pathItem = isRecord(webhooks) ? webhooks[name] : undefined;
+    const [first] = pathItemOperations(pathItem);
+    if (!first) throw new MocklineError(`The spec has no webhook named ${name}.`, 1);
+    const url = webhookOptions.url ?? config.events.webhooks[name] ?? config.events.webhookUrl;
+    if (!url)
+      throw new MocklineError(
+        `No URL for webhook ${name}. Set events.webhooks.${name} or events.webhookUrl.`,
+        1,
+      );
+    const payload = eventPayload(
+      first.operation,
+      specState.current.document,
+      config,
+      deriveSeed(config.seed ?? 0, 'webhook', name, eventCounter++),
+    );
+    return events.send({
+      kind: 'webhook',
+      name,
+      method: first.method,
+      url,
+      ...payload,
+      ...(webhookOptions.body !== undefined ? { body: webhookOptions.body } : {}),
+    });
+  };
   const resetRuntime = async (): Promise<void> => {
     requestCounters.clear();
     sequenceIndexes.clear();
@@ -369,6 +479,7 @@ export async function createMockServer(options: CreateMockServerOptions): Promis
     let bodyPresent: boolean;
     let rawBody: Buffer<ArrayBufferLike> = Buffer.alloc(0);
     let route: MatchedRoute | undefined;
+    let routeParams: Record<string, string> = {};
     let response: MockResponse = problemResponse(
       500,
       'Internal Server Error',
@@ -409,6 +520,11 @@ export async function createMockServer(options: CreateMockServerOptions): Promis
 
     try {
       if (pathname === '/__mockline' || pathname.startsWith('/__mockline/')) {
+        if (method === 'POST') {
+          const read = await readBody(req, config.requestBodyLimit);
+          if (read.parseError) throw new InvalidJsonError(read.parseError);
+          body = read.value;
+        }
         const inspectorResponse = await handleInspector(method, url, {
           enabled: inspectorEnabled,
           recorder,
@@ -416,6 +532,10 @@ export async function createMockServer(options: CreateMockServerOptions): Promis
           spec: specState.current,
           startedAt,
           reset: resetRuntime,
+          events,
+          webhooks: webhookNames,
+          sendWebhook,
+          body,
         });
         response = inspectorResponse
           ? {
@@ -474,20 +594,31 @@ export async function createMockServer(options: CreateMockServerOptions): Promis
           } else {
             if (read.parseError) throw new InvalidJsonError(read.parseError);
             route = match.route;
+            routeParams = match.params;
             let authorized = true;
-            if (config.enforceAuth) {
-              const auth = checkSecurityPresence(
+            if (authEnabled(config)) {
+              const auth = checkSecurity(
                 specState.current.document,
                 route.operation,
                 asHeaders(req.headers),
                 url,
+                config.auth,
+                (options.clock ?? (() => new Date()))().getTime(),
               );
               authorized = auth.authorized;
-              if (!authorized) {
+              if (!authorized && auth.status === 403) {
+                response = problemResponse(
+                  403,
+                  'Forbidden',
+                  'The credential does not have the scopes this operation requires.',
+                  { errors: auth.missing },
+                );
+                source = 'error';
+              } else if (!authorized) {
                 response = problemResponse(
                   401,
                   'Unauthorized',
-                  'A credential declared by the OpenAPI security scheme is required.',
+                  'A valid credential declared by the OpenAPI security scheme is required.',
                   { errors: auth.missing },
                 );
                 responseHeaders = { 'www-authenticate': 'Bearer realm="Bearer"' };
@@ -589,6 +720,23 @@ export async function createMockServer(options: CreateMockServerOptions): Promis
     try {
       if (response.delay && response.delay > 0) await sleep(response.delay);
       writeJson(res, response.status, response.body, headers, method === 'HEAD');
+      if (
+        route &&
+        config.events.callbacks &&
+        source !== 'proxy' &&
+        res.statusCode >= 200 &&
+        res.statusCode < 300
+      )
+        fireCallbacks(route, {
+          url,
+          method,
+          headers: asHeaders(req.headers),
+          params: routeParams,
+          body,
+          statusCode: res.statusCode,
+          responseHeaders: headers,
+          responseBody: response.body,
+        });
     } catch (error) {
       if (!res.destroyed && !res.headersSent) {
         const failure = problem(
@@ -759,6 +907,11 @@ export async function createMockServer(options: CreateMockServerOptions): Promis
     async reset() {
       await resetRuntime();
     },
+    events: Object.assign(() => events.list(), {
+      clear: () => events.clear(),
+      wait: () => events.idle(),
+    }),
+    sendWebhook,
     setOverride(key, override) {
       const parsed = configSchema.parse({ overrides: { [key]: override } }).overrides[key];
       if (!parsed) throw new MocklineError(`Invalid override for ${key}`, 1);
@@ -776,6 +929,7 @@ export async function createMockServer(options: CreateMockServerOptions): Promis
       });
       await recorder.flush();
       await proxyExamples.flush();
+      await events.close();
       await stateWriter.flush();
     },
   };

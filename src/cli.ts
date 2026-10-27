@@ -164,6 +164,8 @@ interface CliOptions extends Record<string, unknown> {
   stateful?: boolean;
   stateFile?: string;
   seedData?: string;
+  webhookUrl?: string;
+  callbacks?: boolean;
   proxy?: string;
   proxyAll?: boolean;
   proxyRecord?: string;
@@ -264,6 +266,11 @@ function makeConfig(base: MocklineConfig, options: CliOptions): MocklineConfig {
         ...(options.proxyAll ? { all: true } : {}),
         ...(options.proxyAllowPrivate ? { allowPrivate: true } : {}),
         ...(options.proxyRecord ? { recordFile: options.proxyRecord } : {}),
+      },
+      events: {
+        ...base.events,
+        ...(options.webhookUrl ? { webhookUrl: options.webhookUrl } : {}),
+        ...(options.callbacks === false ? { callbacks: false } : {}),
       },
       cors: {
         ...base.cors,
@@ -437,6 +444,8 @@ export async function runCli(argv = process.argv.slice(2)): Promise<number> {
     .option('--stateful', 'Enable in-memory resource collections')
     .option('--state-file <file>', 'Load and save stateful data in a JSON file')
     .option('--seed-data <file>', 'Start stateful collections from a JSON file')
+    .option('--webhook-url <url>', 'Default URL for webhooks sent from the spec')
+    .option('--no-callbacks', 'Do not send callbacks declared in the spec')
     .option('--proxy <url>', 'Forward unmatched requests to an upstream')
     .option('--proxy-all', 'Forward all non-inspector requests to the upstream')
     .option('--proxy-record <file>', 'Save upstream responses as JSON examples')

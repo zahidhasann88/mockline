@@ -1,3 +1,4 @@
+import { createHmac, timingSafeEqual } from 'node:crypto';
 import type { ErrorObject } from 'ajv';
 import { validateSchema } from './ajv.js';
 import type {
@@ -333,19 +334,141 @@ export function validateRequest(input: RequestValidationInput): RequestValidatio
   };
 }
 
-export function checkSecurityPresence(
+export interface AuthSettings {
+  apiKeys: string[];
+  bearerTokens: string[];
+  basic: Array<{ username: string; password: string }>;
+  jwtSecret?: string;
+}
+
+export interface SecurityResult {
+  authorized: boolean;
+  status: 401 | 403;
+  missing: string[];
+}
+
+const NO_AUTH: AuthSettings = { apiKeys: [], bearerTokens: [], basic: [] };
+const JWT_ALGORITHMS: Record<string, string> = {
+  HS256: 'sha256',
+  HS384: 'sha384',
+  HS512: 'sha512',
+};
+
+function safeEqual(left: string, right: string): boolean {
+  const a = Buffer.from(left);
+  const b = Buffer.from(right);
+  return a.length === b.length && timingSafeEqual(a, b);
+}
+
+function decodeJsonPart(part: string): UnknownRecord | undefined {
+  try {
+    const value = JSON.parse(Buffer.from(part, 'base64url').toString('utf8')) as unknown;
+    return isRecord(value) ? value : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+function verifyJwt(
+  token: string,
+  secret: string,
+  now: number,
+): { claims?: UnknownRecord; error?: string } {
+  const parts = token.split('.');
+  if (parts.length !== 3) return { error: 'token is not a JWT' };
+  const [headerPart = '', payloadPart = '', signature = ''] = parts;
+  const header = decodeJsonPart(headerPart);
+  const algorithm = JWT_ALGORITHMS[String(header?.alg)];
+  if (!algorithm) return { error: 'JWT must be signed with HS256, HS384 or HS512' };
+  const expected = createHmac(algorithm, secret)
+    .update(`${headerPart}.${payloadPart}`)
+    .digest('base64url');
+  if (!safeEqual(signature, expected)) return { error: 'JWT signature is invalid' };
+  const claims = decodeJsonPart(payloadPart);
+  if (!claims) return { error: 'JWT payload is invalid' };
+  const seconds = now / 1000;
+  if (typeof claims.exp === 'number' && claims.exp <= seconds) return { error: 'JWT has expired' };
+  if (typeof claims.nbf === 'number' && claims.nbf > seconds)
+    return { error: 'JWT is not valid yet' };
+  return { claims };
+}
+
+function tokenScopes(claims: UnknownRecord): string[] {
+  for (const key of ['scope', 'scp', 'scopes']) {
+    const value = claims[key];
+    if (typeof value === 'string') return value.split(' ').filter(Boolean);
+    if (Array.isArray(value)) return value.map(String);
+  }
+  return [];
+}
+
+function bearerToken(headers: RequestValidationInput['headers']): string | undefined {
+  const match = /^Bearer\s+(.+)$/i.exec(headerValue(headers, 'authorization') ?? '');
+  return match?.[1]?.trim();
+}
+
+function checkBearer(
+  name: string,
+  headers: RequestValidationInput['headers'],
+  auth: AuthSettings,
+  scopes: string[],
+  now: number,
+): { problem?: string; forbidden?: boolean } {
+  if (auth.bearerTokens.length === 0 && !auth.jwtSecret)
+    return headerValue(headers, 'authorization') === undefined
+      ? { problem: `${name} (Authorization)` }
+      : {};
+  const token = bearerToken(headers);
+  if (!token) return { problem: `${name} (Authorization: Bearer token)` };
+  if (auth.bearerTokens.some((known) => safeEqual(known, token))) return {};
+  if (!auth.jwtSecret) return { problem: `${name} (unknown bearer token)` };
+  const result = verifyJwt(token, auth.jwtSecret, now);
+  if (!result.claims) return { problem: `${name} (${result.error})` };
+  const granted = tokenScopes(result.claims);
+  const missingScopes = scopes.filter((scope) => !granted.includes(scope));
+  if (missingScopes.length > 0)
+    return { problem: `${name} (missing scope ${missingScopes.join(', ')})`, forbidden: true };
+  return {};
+}
+
+function checkBasic(
+  name: string,
+  headers: RequestValidationInput['headers'],
+  auth: AuthSettings,
+): string | undefined {
+  const header = headerValue(headers, 'authorization');
+  if (auth.basic.length === 0) return header === undefined ? `${name} (Authorization)` : undefined;
+  const match = /^Basic\s+(.+)$/i.exec(header ?? '');
+  if (!match?.[1]) return `${name} (Authorization: Basic credentials)`;
+  const decoded = Buffer.from(match[1].trim(), 'base64').toString('utf8');
+  const separator = decoded.indexOf(':');
+  const username = decoded.slice(0, separator);
+  const password = decoded.slice(separator + 1);
+  const valid =
+    separator >= 0 &&
+    auth.basic.some(
+      (entry) => safeEqual(entry.username, username) && safeEqual(entry.password, password),
+    );
+  return valid ? undefined : `${name} (invalid username or password)`;
+}
+
+export function checkSecurity(
   root: OpenApiDocument,
   operation: ApiOperation,
   headers: RequestValidationInput['headers'],
   url: URL,
-): { authorized: boolean; missing: string[] } {
+  auth: AuthSettings = NO_AUTH,
+  now: number = Date.now(),
+): SecurityResult {
   const requirements = operation.security ?? root.security ?? [];
-  if (requirements.length === 0) return { authorized: true, missing: [] };
+  if (requirements.length === 0) return { authorized: true, status: 401, missing: [] };
   const schemes = root.components?.securitySchemes ?? {};
   const missingAll: string[] = [];
+  let forbidden = false;
   for (const requirement of requirements) {
     const missing: string[] = [];
-    for (const name of Object.keys(requirement)) {
+    let requirementForbidden = false;
+    for (const [name, scopes] of Object.entries(requirement)) {
       const scheme = schemes[name];
       if (!isRecord(scheme)) {
         missing.push(name);
@@ -355,33 +478,51 @@ export function checkSecurityPresence(
       if (type === 'apiKey') {
         const location = String(scheme.in ?? '');
         const credentialName = String(scheme.name ?? '');
-        const headerCredential =
-          location === 'header' ? headerValue(headers, credentialName) : undefined;
-        const present =
+        const value =
           location === 'header'
-            ? headerCredential !== undefined
+            ? headerValue(headers, credentialName)
             : location === 'query'
-              ? url.searchParams.has(credentialName)
+              ? (url.searchParams.get(credentialName) ?? undefined)
               : location === 'cookie'
-                ? cookieValues(headerValue(headers, 'cookie')).has(credentialName)
-                : false;
-        if (!present) missing.push(`${name} (${location} ${credentialName})`);
+                ? cookieValues(headerValue(headers, 'cookie')).get(credentialName)
+                : undefined;
+        if (value === undefined) missing.push(`${name} (${location} ${credentialName})`);
+        else if (auth.apiKeys.length > 0 && !auth.apiKeys.some((known) => safeEqual(known, value)))
+          missing.push(`${name} (invalid API key)`);
+      } else if (type === 'http' && String(scheme.scheme ?? '').toLowerCase() === 'basic') {
+        const problem = checkBasic(name, headers, auth);
+        if (problem) missing.push(problem);
       } else if (
-        type === 'http' ||
+        (type === 'http' && String(scheme.scheme ?? '').toLowerCase() === 'bearer') ||
         type === 'oauth2' ||
-        type === 'openIdConnect' ||
-        type === 'mutualTLS'
+        type === 'openIdConnect'
       ) {
+        const result = checkBearer(name, headers, auth, Array.isArray(scopes) ? scopes : [], now);
+        if (result.problem) missing.push(result.problem);
+        if (result.forbidden) requirementForbidden = true;
+      } else if (type === 'http' || type === 'mutualTLS') {
         if (headerValue(headers, 'authorization') === undefined)
           missing.push(`${name} (Authorization)`);
       } else {
         missing.push(name);
       }
     }
-    if (missing.length === 0) return { authorized: true, missing: [] };
+    if (missing.length === 0) return { authorized: true, status: 401, missing: [] };
+    if (requirementForbidden && missing.every((entry) => entry.includes('missing scope')))
+      forbidden = true;
     missingAll.push(...missing);
   }
-  return { authorized: false, missing: [...new Set(missingAll)] };
+  return { authorized: false, status: forbidden ? 403 : 401, missing: [...new Set(missingAll)] };
+}
+
+export function checkSecurityPresence(
+  root: OpenApiDocument,
+  operation: ApiOperation,
+  headers: RequestValidationInput['headers'],
+  url: URL,
+): { authorized: boolean; missing: string[] } {
+  const { authorized, missing } = checkSecurity(root, operation, headers, url);
+  return { authorized, missing };
 }
 
 export function strictValidationStatus(result: RequestValidationResult): number {

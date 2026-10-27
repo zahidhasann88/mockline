@@ -1,0 +1,52 @@
+openapi: 3.1.0
+info:
+  title: Events
+  version: 1.0.0
+paths:
+  /subscriptions:
+    post:
+      operationId: subscribe
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [callbackUrl]
+              properties:
+                callbackUrl: { type: string }
+      responses:
+        '201':
+          description: Subscribed
+          content:
+            application/json:
+              example: { id: sub-1 }
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              example: { error: bad }
+      callbacks:
+        onEvent:
+          '{$request.body#/callbackUrl}?subscription={$response.body#/id}':
+            post:
+              requestBody:
+                content:
+                  application/json:
+                    example: { event: created }
+              responses:
+                '200': { description: OK }
+webhooks:
+  newPet:
+    post:
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [id, name]
+              properties:
+                id: { type: integer }
+                name: { type: string }
+      responses:
+        '200': { description: OK }

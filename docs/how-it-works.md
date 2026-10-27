@@ -35,6 +35,31 @@ A collection needs `GET /pets` (returns an array), `POST /pets`, and
 - Data is in memory, or in a file with `--state-file`.
 - `POST /__mockline/reset` restores the starting data.
 
+## Callbacks and webhooks
+
+- **Callbacks**: after a `2xx` response, Mockline sends each callback the
+  operation declares. URLs like `{$request.body#/callbackUrl}` are filled in
+  from the request and response.
+- **Webhooks**: sent on demand with `POST /__mockline/webhooks/{name}` or
+  `server.sendWebhook(name)`.
+- Payloads come from examples or the schema.
+- `localhost` is allowed. Other private addresses are blocked unless
+  `events.allowPrivate` is on.
+- Sent events are listed at `GET /__mockline/events` and `server.events()`.
+  Use `await server.events.wait()` in tests.
+
+## Auth
+
+Auth checks run when `enforceAuth` is on or any `auth` value is set.
+
+- With no `auth` values, a credential only has to be present.
+- API keys, basic credentials and bearer tokens must match the configured
+  values.
+- JWTs are verified with `auth.jwtSecret`, including `exp` and `nbf`.
+- Scopes from the spec's `security` are checked against the JWT's `scope`,
+  `scp` or `scopes`.
+- A missing or wrong credential returns `401`. A missing scope returns `403`.
+
 ## Validation
 
 - `off`: no checks.
@@ -56,7 +81,7 @@ On by default for `127.0.0.1`. It has no authentication.
 ## Limits
 
 - For development and tests only. It binds to `127.0.0.1` by default.
-- Auth only checks that credentials are present. They are not verified.
+- Auth checks are for testing, not real security.
 - Request bodies are recorded as-is. Credential headers are hidden.
 - Swagger 2.0 is converted to OpenAPI 3 when loaded.
-- Not supported: webhooks, callbacks, GraphQL and WebSockets.
+- Not supported: GraphQL and WebSockets.

@@ -1,6 +1,10 @@
 import { z } from 'zod';
 
 const nonNegative = z.number().finite().min(0);
+const httpUrl = z
+  .string()
+  .url()
+  .refine((value) => /^https?:\/\//i.test(value), { message: 'must use http or https' });
 const responseShape = z.object({
   status: z.number().int().min(100).max(599).optional(),
   body: z.unknown().optional(),
@@ -137,6 +141,24 @@ export const configSchema = z.object({
     .refine((value) => value.minArrayItems <= value.maxArrayItems, {
       message: 'minArrayItems must not exceed maxArrayItems',
       path: ['minArrayItems'],
+    })
+    .default({}),
+  events: z
+    .object({
+      callbacks: z.boolean().default(true),
+      delay: nonNegative.default(0),
+      timeoutMs: z.number().int().positive().default(5000),
+      allowPrivate: z.boolean().default(false),
+      webhookUrl: httpUrl.optional(),
+      webhooks: z.record(httpUrl).default({}),
+    })
+    .default({}),
+  auth: z
+    .object({
+      apiKeys: z.array(z.string().min(1)).default([]),
+      bearerTokens: z.array(z.string().min(1)).default([]),
+      basic: z.array(z.object({ username: z.string(), password: z.string() })).default([]),
+      jwtSecret: z.string().min(1).optional(),
     })
     .default({}),
   controlHeaders: z.object({ allow: z.boolean().default(true) }).default({}),

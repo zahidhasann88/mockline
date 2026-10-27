@@ -159,7 +159,7 @@ function exampleValue(value: unknown): unknown {
   return value;
 }
 
-function findExample(
+export function findExample(
   media: UnknownRecord,
   preferredName?: string,
 ): { found: boolean; value?: unknown } {

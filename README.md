@@ -12,6 +12,8 @@ tests and demos.
 - Request validation
 - CRUD (create, read, update, delete) with data saved to a file if you want
 - Custom responses, delays and errors
+- Callbacks and webhooks from your spec
+- Auth checks: API keys, basic, bearer tokens and JWT scopes
 - Proxy to a real API
 - Reloads when files change
 - Usable as a CLI, a TypeScript library, or in Vitest/Jest tests
@@ -53,6 +55,7 @@ mockline --help                # all options
 | `--validate <off\|warn\|strict>` | Request validation (default `warn`)   |
 | `--delay <ms>`                   | Add a delay to each response          |
 | `--proxy <url>`                  | Send unknown routes to a real API     |
+| `--webhook-url <url>`            | Where to send webhooks                |
 | `--watch`                        | Reload when files change              |
 
 ## Control a single request

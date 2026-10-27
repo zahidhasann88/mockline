@@ -139,7 +139,7 @@ function targetUrl(upstream: URL, requestUrl: URL): URL {
   return target;
 }
 
-async function resolvesPrivate(hostname: string, timeoutMs: number): Promise<boolean> {
+export async function resolvesPrivate(hostname: string, timeoutMs: number): Promise<boolean> {
   const unbracketedHost = hostname.replace(/^\[(.*)\]$/, '$1');
   if (isIP(unbracketedHost)) return isPrivateAddress(unbracketedHost);
   const normalizedHost = unbracketedHost.toLowerCase().replace(/\.$/, '');

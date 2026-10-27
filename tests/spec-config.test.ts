@@ -80,15 +80,14 @@ describe('spec loading and summaries', () => {
         },
       },
     };
-    const warnings = inspectSpec(document);
-    expect(warnings.map((warning) => warning.message)).toEqual(
+    const messages = inspectSpec(document).map((warning) => warning.message);
+    expect(messages).toEqual(
       expect.arrayContaining([
         expect.stringContaining('No response schema or example'),
-        expect.stringContaining('Callbacks are not supported'),
         expect.stringContaining('Response links are ignored'),
-        expect.stringContaining('Webhooks are not served'),
       ]),
     );
+    expect(messages.join(' ')).not.toMatch(/callback|webhook/i);
   });
 
   it('chooses the lowest successful response before default and falls back as specified', () => {

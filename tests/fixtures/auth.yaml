@@ -1,0 +1,45 @@
+openapi: 3.0.3
+info:
+  title: Auth
+  version: 1.0.0
+paths:
+  /key:
+    get:
+      operationId: withKey
+      security: [{ ApiKey: [] }]
+      responses:
+        '200': { description: OK, content: { application/json: { example: { ok: true } } } }
+  /basic:
+    get:
+      operationId: withBasic
+      security: [{ Basic: [] }]
+      responses:
+        '200': { description: OK, content: { application/json: { example: { ok: true } } } }
+  /bearer:
+    get:
+      operationId: withBearer
+      security: [{ Bearer: [] }]
+      responses:
+        '200': { description: OK, content: { application/json: { example: { ok: true } } } }
+  /admin:
+    get:
+      operationId: admin
+      security: [{ OAuth: [pets:write] }]
+      responses:
+        '200': { description: OK, content: { application/json: { example: { ok: true } } } }
+  /public:
+    get:
+      operationId: open
+      responses:
+        '200': { description: OK, content: { application/json: { example: { ok: true } } } }
+components:
+  securitySchemes:
+    ApiKey: { type: apiKey, in: header, name: X-API-Key }
+    Basic: { type: http, scheme: basic }
+    Bearer: { type: http, scheme: bearer, bearerFormat: JWT }
+    OAuth:
+      type: oauth2
+      flows:
+        clientCredentials:
+          tokenUrl: https://auth.example.test/token
+          scopes: { 'pets:write': Write pets }

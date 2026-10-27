@@ -4,6 +4,8 @@ import { summarizeSpec } from './spec/summary.js';
 import type { LoadedSpec } from './spec/load.js';
 import type { RequestRecorder } from './record.js';
 import type { RecordedRequest, RequestFilter } from './types.js';
+import type { EventSender, SentEvent } from './events.js';
+import type { SendWebhookOptions } from './server.js';
 
 export interface InspectorContext {
   enabled: boolean;
@@ -12,6 +14,10 @@ export interface InspectorContext {
   spec: LoadedSpec;
   startedAt: Date;
   reset: () => Promise<void>;
+  events?: EventSender;
+  webhooks?: () => Array<{ name: string; url?: string }>;
+  sendWebhook?: (name: string, options?: SendWebhookOptions) => Promise<SentEvent>;
+  body?: unknown;
 }
 
 export interface InspectorResult {
@@ -51,6 +57,15 @@ function redactConfig(config: MocklineConfig): Record<string, unknown> {
     (recording as Record<string, unknown>).file
   ) {
     (recording as Record<string, unknown>).file = '[PATH REDACTED]';
+  }
+  const auth = copy.auth;
+  if (typeof auth === 'object' && auth !== null && !Array.isArray(auth)) {
+    const fields = auth as Record<string, unknown>;
+    for (const key of ['apiKeys', 'bearerTokens', 'basic']) {
+      if (Array.isArray(fields[key]) && fields[key].length > 0)
+        fields[key] = (fields[key] as unknown[]).map(() => '[REDACTED]');
+    }
+    if (fields.jwtSecret) fields.jwtSecret = '[REDACTED]';
   }
   return copy;
 }
@@ -163,12 +178,47 @@ export async function handleInspector(
     await context.reset();
     return json(200, { reset: true });
   }
+  if (pathname === '/__mockline/events' && method === 'GET')
+    return json(200, context.events?.list() ?? []);
+  if (pathname === '/__mockline/events' && method === 'DELETE') {
+    context.events?.clear();
+    return json(200, { deleted: true });
+  }
+  if (pathname === '/__mockline/webhooks' && method === 'GET')
+    return json(200, context.webhooks?.() ?? []);
+  const webhookMatch = /^\/__mockline\/webhooks\/([^/]+)$/.exec(pathname);
+  if (webhookMatch && method === 'POST' && context.sendWebhook) {
+    let name = webhookMatch[1] ?? '';
+    try {
+      name = decodeURIComponent(name);
+    } catch {
+      return problemResult(400, 'Bad Request', 'Webhook name contains invalid percent encoding.');
+    }
+    if (!context.webhooks?.().some((webhook) => webhook.name === name))
+      return problemResult(404, 'Not Found', `The spec has no webhook named ${name}.`);
+    const target = url.searchParams.get('url') ?? undefined;
+    try {
+      const event = await context.sendWebhook(name, {
+        ...(context.body !== undefined ? { body: context.body } : {}),
+        ...(target ? { url: target } : {}),
+      });
+      return json(200, event);
+    } catch (error) {
+      return problemResult(
+        400,
+        'Bad Request',
+        error instanceof Error ? error.message : String(error),
+      );
+    }
+  }
   const allowByPath: Record<string, string[]> = {
     '/__mockline/health': ['GET'],
     '/__mockline/spec': ['GET'],
     '/__mockline/config': ['GET'],
     '/__mockline/requests': ['GET', 'DELETE'],
     '/__mockline/reset': ['POST'],
+    '/__mockline/events': ['GET', 'DELETE'],
+    '/__mockline/webhooks': ['GET'],
   };
   const allowed = allowByPath[pathname];
   if (allowed)
