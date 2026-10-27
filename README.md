@@ -1,5 +1,9 @@
 # Mockline
 
+[![npm](https://img.shields.io/npm/v/@zahid15/mockline)](https://www.npmjs.com/package/@zahid15/mockline)
+[![CI](https://github.com/zahidhasann88/mockline/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/zahidhasann88/mockline/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
+
 A local mock API server built from your OpenAPI file. Use it for development,
 tests and demos.
 
@@ -11,7 +15,9 @@ tests and demos.
 - Responses from spec examples, or realistic data generated from schemas
 - Request validation
 - CRUD (create, read, update, delete) with data saved to a file if you want
+- Nested resources: a user's posts need the user, and go when it's deleted
 - Custom responses, delays and errors
+- Response templates that use request values, like `{{request.body.name}}`
 - Callbacks and webhooks from your spec
 - Auth checks: API keys, basic, bearer tokens and JWT scopes
 - Proxy to a real API
